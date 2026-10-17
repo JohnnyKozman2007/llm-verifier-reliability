@@ -3,6 +3,7 @@ import numpy as np, pandas as pd
 import matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from analysis_detectability import build_frame
 
 DOMAINS, COL = ["science", "math", "code"], {"science": "#C44E52", "math": "#4C72B0", "code": "#55A868"}
