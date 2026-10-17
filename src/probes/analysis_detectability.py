@@ -17,6 +17,7 @@ import pandas as pd
 from collections import defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from science_utils import grade_science_candidate, parse_science_for_item
 from execution_grounding import run_candidate_code
 

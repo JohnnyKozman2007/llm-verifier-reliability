@@ -19,6 +19,7 @@ import matplotlib.pyplot as plt
 from scipy.stats import binomtest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from analysis_self_recognition import load_probe, _answer_key, MODELS, N_TESTS_FAMILY
 
 BONF = 0.05 / N_TESTS_FAMILY   # 12 cells (4 models x 3 domains); uncorrected p<.05

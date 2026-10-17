@@ -9,7 +9,9 @@ python-dotenv==1.2.3
 datasets==5.0.1
 
 # Analysis and plotting (report.py)
+numpy==2.3.4
 pandas==3.0.5
 scipy==1.18.0
 matplotlib==3.11.1
 seaborn==0.13.2
+scikit-learn==1.7.2  # cohen_kappa_score, used by src/probes/analysis_ensemble.py

@@ -31,6 +31,7 @@ import os, sys, json, random, asyncio, argparse
 from collections import defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 try:
     sys.stdout.reconfigure(encoding="utf-8")   # GPQA text is unicode-heavy on Windows
 except Exception:

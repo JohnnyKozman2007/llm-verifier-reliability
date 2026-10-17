@@ -19,6 +19,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from analysis_detectability import load_or_build_grades
 from science_utils import parse_science_for_item
 
@@ -31,7 +32,7 @@ N_TESTS_FAMILY = 12
 
 
 def load_probe(domain, mode="actual"):
-    p = os.path.join("data", "self_recognition",
+    p = os.path.join("reports", "probes", "self_recognition",
                      f"{domain}{'' if mode == 'actual' else '_pilot'}.jsonl")
     if not os.path.exists(p):
         print(f"  no probe data at {p}"); return None
