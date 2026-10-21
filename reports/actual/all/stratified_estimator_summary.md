@@ -1,12 +1,12 @@
 # Stratified Estimator Summary (Main Experiment)
 
-- **Evaluated Strata**: 6,969
-- **Distinct Errors**: 779
+- **Evaluated Strata**: 6,340
+- **Distinct Errors**: 709
 - **Self False Positive Rate (FPR)**: 63.0%
-- **Other False Positive Rate (FPR)**: 51.1%
-- **Self-Preference Gap**: +11.9 pp
+- **Other False Positive Rate (FPR)**: 46.3%
+- **Self-Preference Gap**: +13.1 pp
 - **Item-Clustered SE**: 0.79 pp
-- **95% Confidence Interval**: [+10.4, +13.5]
+- **95% Confidence Interval**: [+11.6, +14.7]
 
 ## Model Scale Breakdown
 
