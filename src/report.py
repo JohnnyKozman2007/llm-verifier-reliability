@@ -1003,7 +1003,7 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
         f.write("\n### Math: Answer Matching\n")
         math_agg = agg[agg['domain'] == 'math']
         if not math_agg.empty:
-            f.write("- Math candidates are graded by boxed-answer extraction first, then numeric/exact matching. Symbolically equivalent but differently formatted answers remain a limitation to mention in the paper.\n")
+            f.write("- Math candidates are graded by final-answer extraction, then exact-rational and canonical-form matching: formatting-equivalent answers (plain vs. LaTeX fractions, reduced or not, decimal equivalents, sqrt/pi notation) are accepted. Algebraically equivalent but structurally different rewrites (e.g. factored vs. expanded forms) remain a limitation to mention in the paper.\n")
             f.write(f"- **Math Verification Rows**: {int(math_agg['Total'].sum())}\n")
         else:
             f.write("*(No math domain data present)*\n")

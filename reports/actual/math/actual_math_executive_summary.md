@@ -208,7 +208,7 @@ Full table: `actual_math_domain_validity_checks.csv`.
 *(No science domain data present)*
 
 ### Math: Answer Matching
-- Math candidates are graded by boxed-answer extraction first, then numeric/exact matching. Symbolically equivalent but differently formatted answers remain a limitation to mention in the paper.
+- Math candidates are graded by final-answer extraction, then exact-rational and canonical-form matching: formatting-equivalent answers (plain vs. LaTeX fractions, reduced or not, decimal equivalents, sqrt/pi notation) are accepted. Algebraically equivalent but structurally different rewrites (e.g. factored vs. expanded forms) remain a limitation to mention in the paper.
 - **Math Verification Rows**: 21600
 
 ## 8. Belief vs. Reality (Told Frame vs. Actual Authorship)
