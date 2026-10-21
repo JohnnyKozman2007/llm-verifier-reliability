@@ -1,6 +1,8 @@
 import os
 import json
 import re
+import fractions
+from decimal import Decimal, InvalidOperation
 import argparse
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -84,6 +86,73 @@ def _math_values_equal(a, b, tol=1e-6):
         # LaTeX answers differ only by spacing: "25 + 2\\sqrt{159}" vs "25+2\\sqrt{159}"
         return re.sub(r'\s+', '', a) == re.sub(r'\s+', '', b)
 
+def _normalize_math_string(s):
+    """Strip formatting that does not change meaning: LaTeX spacing/sizing commands,
+    \\dfrac/\\tfrac -> \\frac, and all whitespace."""
+    s = str(s).strip()
+    s = re.sub(r'\\(?:left|right|,|;|:|!|quad|qquad|bigl|bigr|Bigl|Bigr)', '', s)
+    s = s.replace('\\dfrac', '\\frac').replace('\\tfrac', '\\frac')
+    return re.sub(r'\s+', '', s)
+
+def _exact_number(s):
+    """Exact rational value of a plain numeric answer: integers, decimals, 'a/b',
+    and LaTeX '\\frac{a}{b}' (including signs). None if not a plain number.
+
+    Exactness matters: float() cannot parse fractions at all, which is what made
+    '13/51' vs '\\frac{13}{51}' grade as incorrect (audit: 76/264 false negatives).
+    """
+    s = str(s).strip().replace(',', '')
+    neg = s.startswith('-')
+    if neg:
+        s = s[1:]
+    m = re.fullmatch(r'\\frac\{(-?\d+)\}\{(-?\d+)\}', s)
+    if m:
+        try:
+            return fractions.Fraction(int(m.group(1)), int(m.group(2))) * (-1 if neg else 1)
+        except ZeroDivisionError:
+            return None
+    m = re.fullmatch(r'(\d+)\s*/\s*(\d+)', s)
+    if m:
+        try:
+            return fractions.Fraction(int(m.group(1)), int(m.group(2))) * (-1 if neg else 1)
+        except ZeroDivisionError:
+            return None
+    m = re.fullmatch(r'(\d+(?:\.\d+)?)', s)
+    if m:
+        try:
+            return fractions.Fraction(Decimal(m.group(1))) * (-1 if neg else 1)
+        except InvalidOperation:
+            return None
+    return None
+
+def _canonical_expr(s):
+    """Canonical formatting-only form of a symbolic answer, so that equivalent
+    notations compare equal: 'sqrt(2)' == '\\sqrt{2}', '50pi' == '50 \\pi',
+    '2\\cdot 3' == '2*3', 'x^{2}' == 'x^2', '\\frac{a}{b}' == '(a)/(b)'."""
+    s = _normalize_math_string(s)
+    s = re.sub(r'\\frac\{(-?[^{}]+)\}\{(-?[^{}]+)\}', r'(\1)/(\2)', s)
+    s = re.sub(r'\\sqrt\{([^{}]+)\}', r'sqrt(\1)', s)
+    s = s.replace('\\times', '*').replace('\\cdot', '*').replace('\\pi', 'pi').replace('\\infty', 'inf')
+    s = re.sub(r'\^\{(-?[^{}]+)\}', r'^\1', s)
+    return s
+
+def _semantic_math_equal(a, b):
+    """API-free semantic equality between two math answer strings.
+
+    Order: normalized exact string, then exact rational equality (fractions and
+    decimals, reduced or not), then canonical expression equality. Conservative:
+    it only absorbs formatting differences and never evaluates algebra, so it
+    cannot equate two genuinely different answers.
+    """
+    a = _normalize_math_string(a)
+    b = _normalize_math_string(b)
+    if a == b:
+        return True
+    av, bv = _exact_number(a), _exact_number(b)
+    if av is not None and bv is not None:
+        return av == bv
+    return _canonical_expr(a) == _canonical_expr(b)
+
 def _extract_boxed(text):
     """
     Contents of every \\boxed{...}, brace-matched.
@@ -162,10 +231,10 @@ def _answer_matches(region, gt_val):
     region = region.strip()
     if not region:
         return False
-    if _math_values_equal(region, gt_val):
+    if _semantic_math_equal(region, gt_val):
         return True
     for token in _value_tokens(region):
-        if _math_values_equal(token, gt_val):
+        if _semantic_math_equal(token, gt_val):
             return True
     try:
         float(gt_val.replace(',', ''))
