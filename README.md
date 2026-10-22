@@ -20,6 +20,16 @@ and no candidate or verifier prose; code and mathematics traces are released in 
 curators ask that examples not be revealed in plain text, so nothing here reproduces a GPQA
 item. `python src/data_loader.py` (with `HF_TOKEN`) restores the items locally.
 
+## Licence
+
+Code (`src/`, `tests/`, `prompts/`, `run.py`) is MIT. The derived artifacts (`data/`,
+`reports/`, `plots/`) are CC BY 4.0. Third-party benchmarks keep their own terms:
+HumanEval+/EvalPlus (Apache-2.0, built on OpenAI's HumanEval under MIT), MATH (MIT),
+GPQA-Diamond (CC BY 4.0). GPQA-Diamond is credited in the paper as
+*GPQA: A Graduate-Level Google-Proof Q&A Benchmark*, Rein et al. (2024),
+https://github.com/idavidrein/gpqa, with our changes stated: a 150-item subsample and
+per-item option re-ordering. See `LICENSE`.
+
 ## Reproduce
 ```bash
 python -m venv venv && source venv/bin/activate   # Windows: venv\Scripts\activate
