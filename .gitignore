@@ -9,3 +9,10 @@ htmlcov/
 .env
 # Grade caches live in data/graded/ and ARE committed for reproducibility.
 data/graded_*.json
+
+# Pilot artifacts are regenerated locally (pilot path) and are not part of the release.
+data/*/*_pilot.jsonl
+reports/pilot/
+
+tests/.tmp_release_*
+

@@ -3,22 +3,24 @@ import json
 import asyncio
 from models import generate_response, MODELS
 from prompts import get_generation_prompt
+from science_utils import SCIENCE_WITHHELD_PLACEHOLDER as WITHHELD
 
 RAW_DATA_DIR = os.path.join("data", "raw")
 GEN_DATA_DIR = os.path.join("data", "generated")
 os.makedirs(GEN_DATA_DIR, exist_ok=True)
 
 def sanitize_science_item(item):
-    """Sanitizes GPQA-Diamond questions to comply with anti-leakage terms."""
+    """Write the generated record with its question text withheld.
+
+    Options and candidates are deliberately kept here: verify.py consumes the candidates
+    and needs them intact to run. Release redaction happens once, in src/redact_release.py,
+    after the pipeline has finished.
+    """
     clean = dict(item)
-    withheld_msg = (
-        "[WITHHELD: GPQA-Diamond benchmark questions cannot be posted in plain text per curator terms. "
-        "Reconstruct using src/data_loader.py with HF_TOKEN]"
-    )
     if "question" in clean:
-        clean["question"] = withheld_msg
+        clean["question"] = WITHHELD
     if "question_stem" in clean:
-        clean["question_stem"] = withheld_msg
+        clean["question_stem"] = WITHHELD
     return clean
 
 async def generate_for_item(item, domain):

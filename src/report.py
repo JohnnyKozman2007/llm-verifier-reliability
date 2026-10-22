@@ -9,7 +9,12 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.stats import chi2_contingency
 from execution_grounding import run_candidate_code
-from science_utils import grade_science_candidate, parse_science_for_item
+from science_utils import (
+    grade_science_candidate,
+    is_withheld,
+    parse_science_for_item,
+)
+from verdict_utils import normalize_bool_verdict, recover_verdict_from_raw_response
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -30,48 +35,8 @@ def _notes_to_string(notes):
         return ";".join(str(note) for note in notes)
     return str(notes)
 
-def normalize_bool_verdict(value):
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, str):
-        lowered = value.strip().lower()
-        if lowered == "true":
-            return True
-        if lowered == "false":
-            return False
-    return None
-
-
-def recover_verdict_from_raw_response(raw_response):
-    """
-    Recover is_correct from JSON-like verifier responses that failed strict parsing,
-    commonly because LaTeX backslashes such as \\( or \\kappa are invalid JSON escapes.
-    """
-    if not raw_response:
-        return None
-
-    text = str(raw_response).strip()
-
-    try:
-        parsed = json.loads(text)
-        return normalize_bool_verdict(parsed.get("is_correct"))
-    except Exception:
-        pass
-
-    matches = re.findall(
-        r'["\']?is_correct["\']?\s*[:=]\s*["\']?(true|false)["\']?',
-        text,
-        flags=re.IGNORECASE,
-    )
-
-    if not matches:
-        return None
-
-    unique = {match.lower() for match in matches}
-    if len(unique) > 1:
-        return None
-
-    return matches[-1].lower() == "true"
+# normalize_bool_verdict / recover_verdict_from_raw_response live in verdict_utils.py so the
+# release redactor can replay the recovery step without importing the plotting stack.
 
 # Science parsing and grading live in science_utils.py. They used to be duplicated here and
 # in science_utils, with the two copies disagreeing about whether an ambiguous parse counts
@@ -278,6 +243,39 @@ def grade_code(candidate_text, test_code, entry_point=None):
     result = run_candidate_code(candidate_text, test_code, entry_point=entry_point)
     return result.ran_successfully
 
+def load_science_extraction(ver_dir, suffix):
+    """Stored per-(item, generator) science extraction, used when candidate text is redacted.
+
+    The extracted letter is a property of the candidate, not of the verifier, so every
+    verified row sharing (item_id, generator_model) carries the same value; take the first
+    non-null one. This is the same parser output the released traces were graded with.
+    """
+    path = os.path.join(ver_dir, f"science{suffix}")
+    stored = {}
+    if not os.path.exists(path):
+        return stored
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            row = json.loads(line)
+            key = (row.get("item_id"), row.get("generator_model"))
+            entry = {
+                "letter": row.get("candidate_answer_letter"),
+                "option_text": None,
+                "mode": row.get("candidate_answer_extraction_mode"),
+                "confidence": row.get("candidate_answer_extraction_confidence"),
+                "ambiguous": bool(row.get("candidate_answer_ambiguous")),
+                "notes": row.get("candidate_answer_parse_notes") or [],
+            }
+            # A null letter is a legitimate outcome (nothing extractable), so a key with a
+            # null letter must still count as "stored". Only prefer a row where the letter
+            # was actually extracted, since that is the value the original grading used.
+            if key not in stored or (stored[key]["letter"] is None and entry["letter"] is not None):
+                stored[key] = entry
+    return stored
+
+
 def load_and_grade(args):
     graded_candidates = {}
     science_audit_rows = []
@@ -285,6 +283,7 @@ def load_and_grade(args):
     suffix = "_pilot.jsonl" if mode == "pilot" else ".jsonl"
     valid_domains = ["math", "code", "science"]
     domains = valid_domains if "all" in args.domains else [d for d in args.domains if d in valid_domains]
+    stored_science = load_science_extraction(args.ver_dir, suffix)
     
     for domain in domains:
         raw_path = os.path.join(args.raw_dir, f"{domain}{suffix}")
@@ -308,19 +307,39 @@ def load_and_grade(args):
                 
                 for gen_model, cand_text in item.get('candidates', {}).items():
                     if domain == "science":
-                        # parse for the audit columns, but take the verdict from the canonical
-                        # grader so the audit CSV can never disagree with the graded labels.
-                        parsed_science = parse_science_for_item(cand_text, raw_item)
                         ground_truth_letter = str(raw_item.get("ground_truth", "")).upper()
-                        is_correct = grade_science_candidate(cand_text, raw_item)
+                        if is_withheld(cand_text):
+                            # Released traces carry no candidate text. Fall back to the letter that
+                            # was extracted at verification time; never silently grade a redacted
+                            # candidate as wrong, which would print 0% accuracy with no warning.
+                            stored = stored_science.get((item_id, gen_model))
+                            if stored is None:
+                                raise RuntimeError(
+                                    f"Science candidate {item_id}/{gen_model} is redacted and no stored "
+                                    "extraction exists in data/verified/science*.jsonl. Re-run the pipeline "
+                                    "with HF_TOKEN set, or restore the verified traces."
+                                )
+                            parsed_science = stored
+                            ground_truth_text = None
+                            extracted_option_text = None
+                            is_correct = (
+                                stored["letter"] == ground_truth_letter and not stored["ambiguous"]
+                            )
+                        else:
+                            # parse for the audit columns, but take the verdict from the canonical
+                            # grader so the audit CSV can never disagree with the graded labels.
+                            parsed_science = parse_science_for_item(cand_text, raw_item)
+                            ground_truth_text = raw_item.get("correct_answer_text")
+                            extracted_option_text = parsed_science.get("option_text")
+                            is_correct = grade_science_candidate(cand_text, raw_item)
 
                         science_audit_rows.append({
                             "item_id": item_id,
                             "generator": gen_model,
                             "ground_truth_letter": ground_truth_letter,
-                            "ground_truth_text": raw_item.get("correct_answer_text"),
+                            "ground_truth_text": ground_truth_text,
                             "extracted_letter": parsed_science.get("letter"),
-                            "extracted_option_text": parsed_science.get("option_text"),
+                            "extracted_option_text": extracted_option_text,
                             "extraction_mode": parsed_science.get("mode"),
                             "extraction_confidence": parsed_science.get("confidence"),
                             "ambiguous": int(bool(parsed_science.get("ambiguous"))),
@@ -404,12 +423,30 @@ def analyze_verifications(args, graded_candidates, fuzz_dict):
                 verdict_recovered_from_raw = False
 
                 if parsed is None:
-                    recovered = recover_verdict_from_raw_response(v.get("raw_response"))
-                    if recovered is not None:
-                        parsed = recovered
-                        verdict_recovered_from_raw = True
+                    raw_response = v.get("raw_response")
+                    if is_withheld(raw_response):
+                        # Raw response redacted at release: use the recovery decision recorded
+                        # by the redactor, which ran the same recovery function before masking.
+                        recovered = v.get("verdict_recovered")
+                        if recovered is not None:
+                            parsed = bool(recovered)
+                            verdict_recovered_from_raw = True
+                    else:
+                        recovered = recover_verdict_from_raw_response(raw_response)
+                        if recovered is not None:
+                            parsed = recovered
+                            verdict_recovered_from_raw = True
                 thinking = v.get('thinking_or_evaluation', '')
-                verbosity = len(thinking) if thinking else 0
+                verbosity = v.get("verbosity_chars")
+                if verbosity is None:
+                    if is_withheld(thinking):
+                        raise RuntimeError(
+                            f"Row {v.get('item_id')}/{v.get('generator_model')}/"
+                            f"{v.get('verifier_model')}/{v.get('frame')}/{v.get('strategy')} has "
+                            "redacted thinking text but no verbosity_chars column. Re-run "
+                            "src/redact_release.py to backfill it."
+                        )
+                    verbosity = len(thinking) if thinking else 0
                 
                 if parsed is None:
                     # Unparseable verdict: exclude from confusion matrix entirely

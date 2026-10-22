@@ -6,6 +6,19 @@ from typing import Dict, List, Optional, TypedDict
 SCIENCE_FINAL_ANSWER_FORMAT = "FINAL ANSWER: <A, B, C, or D>"
 VALID_OPTION_LABELS = ("A", "B", "C", "D")
 
+# Single source of truth for the placeholder that replaces GPQA-Diamond item text in
+# released artifacts. Any value containing "[WITHHELD" is treated as redacted, so
+# report generation and the data loader can both branch on one marker.
+SCIENCE_WITHHELD_PLACEHOLDER = (
+    "[WITHHELD: GPQA-Diamond benchmark questions cannot be posted in plain text per curator terms. "
+    "Reconstruct using src/data_loader.py with HF_TOKEN]"
+)
+
+
+def is_withheld(value) -> bool:
+    """True when a field carries the release placeholder rather than real GPQA text."""
+    return isinstance(value, str) and "[WITHHELD" in value
+
 
 class ParsedScienceAnswer(TypedDict):
     letter: Optional[str]
