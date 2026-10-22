@@ -19,30 +19,10 @@
 %  \usepackage[creativeai]{neurips_2026}
 % 5. "sglblindworkshop" option is used for the Workshop with single-blind reviewing
  % \usepackage[sglblindworkshop]{neurips_2026}
-% 6. "dblblindworkshop" option is used for the Workshop with double-blind reviewing
- \usepackage[dblblindworkshop]{neurips_2026}
-% 7. "education" option is used for the Education Track
-%  \usepackage[education]{neurips_2026}
-
-
-% After being accepted, the authors should add "final" behind the track to compile a camera-ready version.
-% 1. Main Track
- % \usepackage[main, final]{neurips_2026}
-% 2. Position Paper Track
-%  \usepackage[position, final]{neurips_2026}
-% 3. Evaluations & Datasets Track
- % \usepackage[eandd, final]{neurips_2026}
-% 4. Creative AI Track
-%  \usepackage[creativeai, final]{neurips_2026}
-% 5. Workshop with single-blind reviewing
-%  \usepackage[sglblindworkshop, final]{neurips_2026}
-% 6. Workshop with double-blind reviewing
-%  \usepackage[dblblindworkshop, final]{neurips_2026}
-% Note. For the workshop paper template, both \title{} and \workshoptitle{} are required, with the former indicating the paper title shown in the title and the latter indicating the workshop title displayed in the footnote.
-% For workshops (5., 6.), the authors should add the name of the workshop, "\workshoptitle" command is used to set the workshop title.
-\workshoptitle{Who Verifies the Agents? Toward Reliable Agent Development}
-% 7. Education Track
-% \usepackage[education, final]{neurips_2026}
+\usepackage[final]{neurips_2026}
+\makeatletter
+\renewcommand{\@noticestring}{Workshop on Who Verifies the Agents? Toward Reliable Agent Development, NeurIPS 2026.}
+\makeatother
 
 % "preprint" option is used for arXiv or other preprint submissions
  % \usepackage[preprint]{neurips_2026}
@@ -70,13 +50,19 @@
 \title{Neither Blinding Nor a Jury, Neither Capability Nor Strategy: What Brings a Verifier to Reliability}
 
 
-% The \author macro works with any number of authors. There are two commands
-% used to separate the names and addresses of multiple authors: \And and \AND.
-%
-% Using \And between authors leaves it to LaTeX to determine where to break the
-% lines. Using \AND forces a line break at that point. So, if LaTeX puts 3 of 4
-% authors names on the first line, and the last on the second line, try using
-% \AND instead of \And before the third author name.
+\author{%
+  Johnny Kozman\thanks{Equal contribution.} \\
+  University of Hertfordshire \\
+  \texttt{jg25abs@herts.ac.uk} \\
+  \And
+  Tilak Parajuli\footnotemark[1] \\
+  Tribhuvan University \\
+  \texttt{tilak.765421@bkmc.tu.edu.np} \\
+  \And
+  Arushi Waddepalli\footnotemark[1] \\
+  Indian Institute of Information Technology, Lucknow \\
+  \texttt{lit2024009@iiitl.ac.in} \\
+}
 
 
 
@@ -182,7 +168,7 @@ jointly rule out self-recognition as the mechanism behind self-preference. (iii)
 that error detectability falls with generator strength and that judge failures are
 correlated, which together explain why stronger judges, better prompts and larger panels
 all fail on ungrounded tasks. (iv) Evidence that verifier reliability strongly correlates
-with the signal the environment supplies, rather than the judge reading it. We release all prompts, code, and the 64{,}800 verification records in an anonymized repository for review---with full model responses for code and mathematics, and identifiers, answer letters and verdicts for science, whose item text cannot be redistributed (Appendix~\ref{app:release}): \url{https://anonymous.4open.science/r/JUDGe-who-verifies-agents-6A34/}.
+with the signal the environment supplies, rather than the judge reading it. We release all prompts, code, and the 64{,}800 verification records---with full model responses for code and mathematics, and identifiers, answer letters and verdicts for science, whose item text cannot be redistributed (Appendix~\ref{app:release}): \url{https://github.com/JohnnyKozman2007/llm-verifier-reliability}.
 \paragraph{Related work.}
 LLM-as-a-judge evaluation is now standard practice, alongside a catalogue of its failure
 modes: position and verbosity bias~\citep{zheng2023judging,wang2023fair}, and a preference
