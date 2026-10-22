@@ -15,7 +15,11 @@ Capability Nor Strategy: What Brings a Verifier to Reliability"**
 - `paper/` workshop paper sources (numbers aligned with the corrected MATH grader)
 
 GPQA-Diamond question and answer-option text are withheld per the dataset's terms;
-`python src/data_loader.py` (with `HF_TOKEN`) restores both.
+`python src/data_loader.py --domain science` (with `HF_TOKEN`) restores both, and also
+replaces the released redacted science candidates/verification traces with the
+pre-redaction versions from the project history, so science reports regenerate exactly as
+before the redaction. Restored files contain gated option text and stay local — do not
+commit them back to the public release.
 
 ## Reproduce
 ```bash
@@ -30,9 +34,11 @@ python src/probes/analysis_ensemble.py            # other probes live in src/pro
 ```
 Pilot-run files are not included; `--mode pilot` regenerates them.
 
-Science report regeneration needs the restored dataset: `python src/report.py` **stops**
-if `data/raw/science*.jsonl` still contains `[WITHHELD]` placeholders and points to the
-committed `reports/` files instead. Math and code reports regenerate without it.
+Science report regeneration: `python src/report.py` **stops** when science data is redacted
+(raw or generated files carry the option-redaction marker) and points to the committed
+`reports/` files. With `HF_TOKEN`, `python src/data_loader.py --domain science --mode <mode>`
+restores the full data — dataset, and the pre-redaction candidates/traces from history —
+after which reports regenerate normally. Math and code reports regenerate without it.
 
 Note: code-candidate correctness is re-graded by executing candidates against the tests with a
 5-second timeout, so a few slow HumanEval items can flip on a slower machine and shift headline

@@ -1035,15 +1035,20 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
             
     print(f"Reports successfully generated in {out_dir}/ and {plot_dir}/")
 
+OPTION_PLACEHOLDER = "[WITHHELD: GPQA-Diamond option text]"
+
+
 def science_data_is_redacted(mode="actual"):
-    """True when the mode's raw OR generated science files still have [WITHHELD].
+    """True when the mode's raw OR generated science files still carry the
+    option-redaction marker.
 
     The public release withholds GPQA-Diamond question and option text. Science
     candidates are re-graded from data/generated, so even a restored raw file is not
-    enough: the candidates themselves must be regenerated against the real options,
-    otherwise the option-text extraction step mislabels candidates (2 of 600) and the
-    aggregate reports would be silently wrong. Report generation therefore refuses to
-    run while either file is redacted.
+    enough: the candidates themselves must contain the real option strings, otherwise
+    the option-text extraction step mislabels candidates (2 of 600) and the aggregate
+    reports would be silently wrong. Report generation therefore refuses to run while
+    either file is redacted. Question placeholders alone are fine - questions stay
+    withheld even for licensed readers.
     """
     suffix = "_pilot.jsonl" if mode == "pilot" else ".jsonl"
     for rel in ("data/raw", "data/generated"):
@@ -1052,7 +1057,7 @@ def science_data_is_redacted(mode="actual"):
             continue
         with open(path, encoding="utf-8") as f:
             for line in f:
-                if "[WITHHELD" in line:
+                if OPTION_PLACEHOLDER in line:
                     return True
     return False
 
@@ -1063,17 +1068,19 @@ def _redacted_science_guard(args):
         suffix = "_pilot.jsonl" if args.mode == "pilot" else ".jsonl"
         print(
             "ERROR: science data is redacted (GPQA-Diamond withheld).\n"
-            f"  data/raw/science{suffix} and/or data/generated/science{suffix} still contain\n"
-            "  [WITHHELD] placeholders, so science results cannot be regenerated without\n"
-            "  producing weak data (candidates are re-graded from data/generated; the\n"
-            "  option-text extraction step needs the real option strings and 2 of 600\n"
+            f"  data/raw/science{suffix} and/or data/generated/science{suffix} still carry\n"
+            "  the option-redaction marker, so science results cannot be regenerated\n"
+            "  without producing weak data (candidates are re-graded from data/generated;\n"
+            "  the option-text extraction step needs the real option strings and 2 of 600\n"
             "  candidates would mislabel). Nothing was written.\n"
             "  Options:\n"
             "    - use the committed reports under reports/ as the reference results; or\n"
-            f"    - run the full pipeline to regenerate science candidates:\n"
-            f"        python src/data_loader.py --domain science --mode {args.mode}   (needs HF_TOKEN)\n"
-            f"        python run.py --mode {args.mode} --domain science               (needs API access)\n"
-            "      then re-run this command.\n"
+            "    - restore the full science data with your gated-access token:\n"
+            f"        python src/data_loader.py --domain science --mode {args.mode}\n"
+            "      (needs HF_TOKEN in .env; this restores the dataset and replaces the\n"
+            "      released redacted candidates/verification traces with the\n"
+            "      pre-redaction versions from the project history), then re-run this\n"
+            "      command.\n"
             "  Math and code reports are unaffected: run --domains math and/or --domains code."
         )
         sys.exit(1)

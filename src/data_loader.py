@@ -1,6 +1,7 @@
 import os
 import json
 import random
+import subprocess
 from datasets import load_dataset
 from dotenv import load_dotenv
 from science_utils import build_option_map, render_science_question, validate_science_options
@@ -9,6 +10,10 @@ load_dotenv()
 
 RAW_DATA_DIR = os.path.join("data", "raw")
 os.makedirs(RAW_DATA_DIR, exist_ok=True)
+
+# Marker written by the public-release redaction (PR #6 onwards). Question text keeps
+# its own placeholder even for licensed users; this one marks option/answer text.
+OPTION_PLACEHOLDER = "[WITHHELD: GPQA-Diamond option text]"
 
 def load_math(mode):
     print("Loading MATH dataset...")
@@ -167,6 +172,55 @@ def save_data(data, domain, mode, overwrite=False):
             f.write(json.dumps(item) + "\n")
     print(f"Added {len(new_items)} new items to {out_path} (total: {len(existing_items) + len(new_items)})")
 
+def restore_unredacted_science_outputs(mode):
+    """Replace the released (redacted) science candidates/traces with the
+    pre-redaction versions kept in the project's git history.
+
+    The raw dataset restore above only rebuilds data/raw/science*.jsonl. The released
+    data/generated and data/verified science files were also redacted (option text in
+    candidates and verifier reasoning), and no local computation can rebuild them.
+    A reader holding the gated dataset is entitled to the full local data, so after the
+    raw restore we swap in the newest history version that predates the redaction.
+    These restored files stay on this machine; committing them back to the public
+    release would re-publish the gated option text.
+    """
+    suffix = "_pilot.jsonl" if mode == "pilot" else ".jsonl"
+    restored = []
+    for rel in (os.path.join("data", "generated", f"science{suffix}"),
+                os.path.join("data", "verified", f"science{suffix}")):
+        if not os.path.exists(rel):
+            continue  # pilot outputs are not part of the release
+        with open(rel, encoding="utf-8") as f:
+            if OPTION_PLACEHOLDER not in f.read():
+                continue  # already unredacted
+        git_path = rel.replace(os.sep, "/")
+        try:
+            shas = subprocess.run(
+                ["git", "log", "--format=%H", "--", git_path],
+                capture_output=True, text=True, check=True).stdout.split()
+        except (OSError, subprocess.CalledProcessError):
+            print(f"  [5/5] could not read git history for {rel}; it stays redacted.")
+            continue
+        for sha in shas:
+            try:
+                content = subprocess.run(
+                    ["git", "show", f"{sha}:{git_path}"],
+                    capture_output=True, text=True, check=True).stdout
+            except subprocess.CalledProcessError:
+                continue
+            if content and OPTION_PLACEHOLDER not in content:
+                with open(rel, "w", encoding="utf-8") as f:
+                    f.write(content)
+                print(f"  [5/5] restored unredacted {rel} from history ({sha[:7]})")
+                restored.append(rel)
+                break
+        else:
+            print(f"  [5/5] no pre-redaction version of {rel} found in history.")
+    if restored:
+        print("  NOTE: restored files contain gated GPQA option text. They are local to")
+        print("        this machine; do not commit them back to the public release.")
+
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
@@ -185,5 +239,7 @@ if __name__ == "__main__":
         elif domain == "science":
             data = load_science(args.mode)
         save_data(data, domain, args.mode, overwrite=args.overwrite)
-    
+        if domain == "science":
+            restore_unredacted_science_outputs(args.mode)
+
     print("Data loading complete.")

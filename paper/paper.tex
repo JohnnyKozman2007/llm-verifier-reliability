@@ -533,12 +533,16 @@ override audit, and the harnesses that produced them, together with the analysis
 for every table and figure. Everything is public at
 \url{https://github.com/JohnnyKozman2007/llm-verifier-reliability}. The GPQA-Diamond
 questions and their answer options are withheld per the dataset's gated-access terms;
-running \texttt{src/data\_loader.py} with an \texttt{HF\_TOKEN} restores both locally,
-and the sampling seed plus the per-item option seed in \S\ref{sec:setup} reproduce the
-exact 150-item sample and option order. Hosted temperature-0 decoding is deterministic in
-intent but not bit-reproducible, so we release the traces themselves and every statistic
-is recomputable offline from them. Report generation deliberately refuses to re-derive
-science results from redacted data and points to the committed reports instead.
+running \texttt{src/data\_loader.py} with an \texttt{HF\_TOKEN} restores both locally and
+also replaces the released redacted science candidates and verification traces with the
+pre-redaction versions kept in the project history, so report generation then runs
+exactly as it did before the release redaction; the sampling seed plus the per-item
+option seed in \S\ref{sec:setup} reproduce the exact 150-item sample and option order.
+Without the token the science data cannot be restored, and report generation refuses to
+re-derive science results from the redacted files, pointing to the committed reports
+instead (math and code regenerate without the dataset). Hosted temperature-0 decoding is
+deterministic in intent but not bit-reproducible, so we release the traces themselves and
+every statistic is recomputable offline from them.
 \begin{thebibliography}{11}
 \small
 
