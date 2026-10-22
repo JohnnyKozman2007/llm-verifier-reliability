@@ -32,6 +32,12 @@ SCIENCE_FIELDS_TO_DROP = ("options", "option_map", "correct_answer_text")
 VERIFIED_TEXT_FIELDS = ("raw_response", "thinking_or_evaluation", "candidate_answer_text")
 PROBE_TEXT_FIELDS = ("original_text", "mistral_text", "control_text")
 
+# Probe traces differ in schema (style-transfer rewrites, self-recognition prompts,
+# structural-preference reasoning), so fields are masked by shape rather than by name:
+# anything that reads as prose in a science row is withheld, short categorical fields stay.
+PROBE_SAFE_FIELDS = {"item_id", "domain"}
+PROBE_TEXT_TOKENS = ("text", "prompt", "response", "code", "answer", "question", "stem", "rationale", "reasoning")
+
 RAW = os.path.join("data", "raw")
 GENERATED = os.path.join("data", "generated")
 VERIFIED = os.path.join("data", "verified")
@@ -97,6 +103,16 @@ def redact_verified(path):
     return len(rows)
 
 
+def _probe_field_carries_text(key, value):
+    """True when a probe field holds prose that could quote a GPQA item."""
+    if not isinstance(value, str) or not value or key in PROBE_SAFE_FIELDS:
+        return False
+    name = key.lower()
+    if any(token in name for token in PROBE_TEXT_TOKENS):
+        return True
+    return len(value) > 40
+
+
 def redact_probe_traces(reports_dir):
     """Mask the science rows of the probe traces that reproduce candidate text."""
     touched = {}
@@ -113,8 +129,8 @@ def redact_probe_traces(reports_dir):
             for row in rows:
                 if row.get("domain") != "science":
                     continue
-                for key in PROBE_TEXT_FIELDS:
-                    if isinstance(row.get(key), str) and row[key]:
+                for key, value in list(row.items()):
+                    if _probe_field_carries_text(key, value):
                         row[key] = WITHHELD
                         changed += 1
             if changed:
@@ -224,9 +240,8 @@ def check(data_dir, reports_dir):
                 for row in _read_jsonl(path):
                     if row.get("domain") != "science":
                         continue
-                    for field in PROBE_TEXT_FIELDS:
-                        value = row.get(field)
-                        if isinstance(value, str) and value and "[WITHHELD" not in value:
+                    for field, value in row.items():
+                        if _probe_field_carries_text(field, value) and "[WITHHELD" not in value:
                             problems.append((path, f"{row.get('item_id')} still has '{field}'"))
     for root, _, files in os.walk(reports_dir):
         if f"{os.sep}probes{os.sep}" in root or f"{os.sep}pilot{os.sep}" in root:
