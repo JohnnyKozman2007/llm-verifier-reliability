@@ -108,8 +108,8 @@
   judges fail together rather than independently, so adding judges buys nothing. Only
   an environment signal changes the picture, and even then judges override that signal
   on roughly one call in ten, with independent differential testing confirming under
-  8\% of those overrides as justified. The binding constraint on agent
-  verification is the signal the environment can supply, not the model reading it.
+  8\% of those overrides as justified. Across these domains, verifier reliability
+  strongly correlates with the signal the environment supplies, rather than the model reading it.
 \end{abstract}
 
 \section{Introduction}
@@ -181,7 +181,8 @@ transfer, structural preference, and self-recognition with a consistency control
 jointly rule out self-recognition as the mechanism behind self-preference. (iii) Evidence
 that error detectability falls with generator strength and that judge failures are
 correlated, which together explain why stronger judges, better prompts and larger panels
-all fail on ungrounded tasks. (iv) Evidence that the binding constraint on agent verification is the signal the environment supplies, not the judge reading it. We release all prompts, code, and the 64{,}800 verification records in an anonymized repository for review---with full model responses for code and mathematics, and identifiers, answer letters and verdicts for science, whose item text cannot be redistributed (Appendix~\ref{app:release}): \url{https://anonymous.4open.science/r/JUDGe-who-verifies-agents-6A34/}.
+all fail on ungrounded tasks. (iv) Evidence that verifier reliability strongly correlates
+with the signal the environment supplies, rather than the judge reading it. We release all prompts, code, and the 64{,}800 verification records in an anonymized repository for review---with full model responses for code and mathematics, and identifiers, answer letters and verdicts for science, whose item text cannot be redistributed (Appendix~\ref{app:release}): \url{https://anonymous.4open.science/r/JUDGe-who-verifies-agents-6A34/}.
 \paragraph{Related work.}
 LLM-as-a-judge evaluation is now standard practice, alongside a catalogue of its failure
 modes: position and verbosity bias~\citep{zheng2023judging,wang2023fair}, and a preference
@@ -192,9 +193,9 @@ models cannot reliably correct their own reasoning without external
 feedback~\citep{huang2024selfcorrect}, and that execution- or process-level signals
 substantially improve verification~\citep{liu2023evalplus,lightman2024verify}. We differ in
 three ways: we separate believed from actual authorship rather than confounding them; we
-test the self-recognition account against a consistency control; and we vary the
-availability of an environment signal while holding the judge pool fixed, which lets us
-attribute reliability to grounding rather than to judge capability.
+test the self-recognition account against a consistency control; and we compare
+verification across tasks with and without an environment signal while holding the judge pool fixed, showing
+how strongly reliability correlates with environmental grounding rather than judge capability.
 
 \section{Setup and judging system}
 \label{sec:setup}
@@ -529,10 +530,10 @@ judges to authorship misses as well: models are nearly indifferent to the \emph{
 varying by under one percentage point, yet approve their own errors 13.1 points more often
 when they truly wrote them. That gap survives a placebo-controlled style transfer and
 dissolves under a consistency control, so what persists is the conclusion a model still
-holds, not recognition of its own prose. Reliable verification therefore requires the
-environment---though not blind trust in the judge reading it, since verifiers that override
+holds, not recognition of its own prose. Reliable verification in our experiments
+strongly correlates with the presence of an environmental signal---though not with blind trust in the judge reading it, since verifiers that override
 a passing test suite are unjustified in at least 77\% of cases and confirmed in only 7.3\%.
-The path forward is verifiable environments, and judges aligned to defer to them.
+The path forward points toward verifiable environments, and judges aligned to defer to them.
 
 \section*{Reproducibility Statement}
 \label{sec:repro-statement}
