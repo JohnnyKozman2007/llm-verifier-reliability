@@ -2,7 +2,7 @@
 
 Code, prompts, and verification traces for **"Neither Blinding Nor a Jury, Neither
 Capability Nor Strategy: What Brings a Verifier to Reliability"**
-(TAE workshop, NeurIPS 2026).
+(Verify-Agents Workshop, NeurIPS 2026).
 
 64,800 verification calls: 4 models x 3 authorship frames x 3 strategies x 3 domains
 (HumanEval+, MATH, GPQA-Diamond), 150 items per domain.
