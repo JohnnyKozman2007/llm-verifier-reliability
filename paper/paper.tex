@@ -525,6 +525,20 @@ environment---though not blind trust in the judge reading it, since verifiers th
 a passing test suite are unjustified in at least 77\% of cases and confirmed in only 7.3\%.
 The path forward is verifiable environments, and judges aligned to defer to them.
 \FloatBarrier
+
+\section*{Reproducibility statement}
+Every number in this paper is derived from released artifacts: all 64{,}800 verification
+records with their raw model responses, the 1{,}800 generated candidates, the full
+override audit, and the harnesses that produced them, together with the analysis scripts
+for every table and figure. Everything is public at
+\url{https://github.com/JohnnyKozman2007/llm-verifier-reliability}. The GPQA-Diamond
+questions and their answer options are withheld per the dataset's gated-access terms;
+running \texttt{src/data\_loader.py} with an \texttt{HF\_TOKEN} restores both locally,
+and the sampling seed plus the per-item option seed in \S\ref{sec:setup} reproduce the
+exact 150-item sample and option order. Hosted temperature-0 decoding is deterministic in
+intent but not bit-reproducible, so we release the traces themselves and every statistic
+is recomputable offline from them. Report generation deliberately refuses to re-derive
+science results from redacted data and points to the committed reports instead.
 \begin{thebibliography}{11}
 \small
 

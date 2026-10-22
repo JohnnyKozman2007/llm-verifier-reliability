@@ -14,8 +14,8 @@ Capability Nor Strategy: What Brings a Verifier to Reliability"**
 - `prompts/` rewrite prompts used in the style-transfer probe
 - `paper/` workshop paper sources (numbers aligned with the corrected MATH grader)
 
-GPQA-Diamond question text is withheld per the dataset's terms; `python src/data_loader.py`
-(with `HF_TOKEN`) restores it.
+GPQA-Diamond question and answer-option text are withheld per the dataset's terms;
+`python src/data_loader.py` (with `HF_TOKEN`) restores both.
 
 ## Reproduce
 ```bash
@@ -29,6 +29,10 @@ python src/report.py --mode actual --domains all
 python src/probes/analysis_ensemble.py            # other probes live in src/probes/
 ```
 Pilot-run files are not included; `--mode pilot` regenerates them.
+
+Science report regeneration needs the restored dataset: `python src/report.py` **stops**
+if `data/raw/science*.jsonl` still contains `[WITHHELD]` placeholders and points to the
+committed `reports/` files instead. Math and code reports regenerate without it.
 
 Note: code-candidate correctness is re-graded by executing candidates against the tests with a
 5-second timeout, so a few slow HumanEval items can flip on a slower machine and shift headline
