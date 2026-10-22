@@ -1228,6 +1228,35 @@ Primary statistical controls & Binomial chance floor (25\%), conclusion consiste
 \end{tabular}
 \end{table}
 
+\begin{table}[H]
+\centering
+\small
+\caption{Self-recognition probe results: raw selection accuracy vs.\ conclusion-controlled decisive test. Chance accuracy is 25\% for the 4-way choice; in the decisive test, chance reflects the number of models sharing that conclusion on tied items. Apparent recognition dissolves once conclusion-matching is accounted for ($p$-values evaluated against Bonferroni family threshold $\alpha = 0.05/12 = 0.0042$).}
+\label{tab:self-rec-results}
+\begin{tabular}{llcccc}
+\toprule
+Domain & Model & Raw accuracy & 95\% CI & Decisive test (observed vs.\ chance) & Bonferroni verdict \\
+\midrule
+Science & DeepSeek & 56.0\% & [47.7, 64.1] & 47.9\% vs.\ 36.2\% ($p=0.0021$) & Style recognition \\
+Science & Qwen     & 27.3\% & [20.3, 35.3] & 23.3\% vs.\ 36.0\% ($p=0.9840$) & Conclusion-matching only \\
+Science & Llama    & 31.3\% & [24.0, 39.5] & 26.9\% vs.\ 35.8\% ($p=0.9610$) & Conclusion-matching only \\
+Science & Mistral  & 11.3\% & [6.7, 17.5]  & 10.3\% vs.\ 35.9\% ($p=0.0001$) & Below chance (aesthetic bias) \\
+\midrule
+Math    & DeepSeek & 42.0\% & [34.0, 50.3] & 36.8\% vs.\ 33.1\% ($p=0.2810$) & Conclusion-matching only \\
+Math    & Qwen     & 38.0\% & [30.2, 46.2] & 32.1\% vs.\ 33.0\% ($p=0.6120$) & Conclusion-matching only \\
+Math    & Llama    & 34.0\% & [26.5, 42.1] & 30.5\% vs.\ 32.9\% ($p=0.7430$) & Conclusion-matching only \\
+Math    & Mistral  & 20.0\% & [13.9, 27.3] & 18.2\% vs.\ 33.2\% ($p=0.0120$) & Conclusion-matching only$^\dagger$ \\
+\midrule
+Code    & DeepSeek & 36.7\% & [29.0, 44.9] & 32.4\% vs.\ 31.8\% ($p=0.4520$) & Conclusion-matching only \\
+Code    & Qwen     & 34.7\% & [27.1, 42.8] & 30.9\% vs.\ 31.5\% ($p=0.5840$) & Conclusion-matching only \\
+Code    & Llama    & 32.7\% & [25.3, 40.8] & 29.8\% vs.\ 31.6\% ($p=0.6950$) & Conclusion-matching only \\
+Code    & Mistral  & 14.0\% & [8.9, 20.6]  & 13.5\% vs.\ 31.7\% ($p=0.0003$) & Below chance (aesthetic bias) \\
+\bottomrule
+\end{tabular}
+\vspace{2pt}
+{\footnotesize $^\dagger$Does not survive family-wise Bonferroni correction ($p \ge 0.0042$).}
+\end{table}
+
 \subsection{Belief-vs-Reality, Full 2x2}
 \begin{table}[H]
 \centering
