@@ -103,9 +103,8 @@ def extract_option_map_from_question(question_text: str) -> Dict[str, str]:
     Extract A-D options from rendered question text, including multiline options.
 
     This handles cases like:
-    A. 1. Zn, ether
-       2. HCl
-       3. Aq. KOH
+    A. first step
+       second step
     B. ...
     """
     if not question_text:
