@@ -102,8 +102,9 @@
   that gap self-recognition---rewriting an answer into another model's prose leaves the
   verdict unmoved. Self-preference is belief persistence, so blinding cannot remove it.
   The second fix is a better or larger panel. Errors from stronger generators are
-  systematically harder to catch---the same direction in all three domains---and no
-  verification strategy narrows the gap; where the task admits no executable check,
+  systematically harder to catch in the two ungrounded domains---significantly in
+  science, non-monotonically in math---and no prompting strategy narrows the gap;
+  where the task admits no executable check,
   judges fail together rather than independently, so adding judges buys nothing. Only
   an environment signal changes the picture, and even then judges override that signal
   on roughly one call in ten, with independent differential testing confirming under
@@ -160,8 +161,9 @@ expressing it---so blinding a judge to authorship cannot remove a bias that does
 through authorship.
 
 The remaining unreliability is structural rather than correctable by better judging.
-Errors from stronger generators are systematically harder to catch, in the same direction
-in all three domains, and no strategy narrows the gap; where no mechanical check exists,
+Errors from stronger generators are systematically harder to catch in the two ungrounded
+domains---significantly in science, non-monotonically in math---and no prompting strategy
+narrows the gap; where no mechanical check exists,
 judges fail together rather than independently, so a panel inherits a shared blind spot
 instead of averaging it away. What changes the picture is a signal from the environment
 rather than a better model reading the answer: judge accuracy runs at 87.7\% where the
@@ -514,8 +516,9 @@ not produce---are better targets than authorship blinding.
 
 Agreement is not verification. Across 64{,}800 verifications, judges without an
 environmental signal fail together rather than independently, a stronger generator's errors
-are correspondingly harder for any of them to catch, and no verification strategy closes
-the gap---so larger panels and better prompting do not deliver what they promise. Blinding
+are correspondingly harder for any of them to catch in ungrounded domains, and no prompting
+strategy closes the gap---so larger panels and better prompting do not deliver what they
+promise. Blinding
 judges to authorship misses as well: models are nearly indifferent to the \emph{told} frame,
 varying by under one percentage point, yet approve their own errors 13.1 points more often
 when they truly wrote them. That gap survives a placebo-controlled style transfer and
