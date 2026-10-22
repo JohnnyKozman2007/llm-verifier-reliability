@@ -217,7 +217,10 @@ therefore a checkable task presented to an unaided judge, which separates
 shuffled per item under a fixed seed (seed~42) and rendered as A--D before the
 question is presented to either generator or verifier. Items whose options fail
 a validity check (empty option, duplicate option, or malformed label set) are
-discarded before the 150-item sample is drawn.
+discarded before the 150-item sample is drawn. The released traces carry no GPQA-Diamond item
+text: science records are released as identifiers, answer letters, parse metadata and
+verdicts only, and \texttt{python src/redact\_release.py --check} fails if any question, option
+or model answer text reappears (Appendix~\ref{app:release}).
 
 \begin{table}[H]
   \caption{The three domains differ in whether a mechanical check exists and, separately,
@@ -530,6 +533,26 @@ holds, not recognition of its own prose. Reliable verification therefore require
 environment---though not blind trust in the judge reading it, since verifiers that override
 a passing test suite are unjustified in at least 77\% of cases and confirmed in only 7.3\%.
 The path forward is verifiable environments, and judges aligned to defer to them.
+
+\section*{Reproducibility Statement}
+\label{sec:repro-statement}
+
+Everything needed to recompute the numbers in this paper is in the paper or in the released
+repository. Section~\ref{sec:setup} names the four models, the serving provider, the decoding
+settings and the sampling seeds; the appendix gives the prompt components verbatim, the
+verdict parser with its fallback, and the token budgets. The repository contains the harness,
+the prompts, the generated candidates and all 64{,}800 verification records, and two
+reproduction paths are documented and tested. \emph{From the release}, with no credentials,
+\texttt{python src/report.py --mode actual --domains all} regenerates every table and figure
+offline; science grading reads the answer letter recorded at verification time, so the
+released records reproduce the published numbers exactly. \emph{From scratch}, with a
+Hugging Face token and a serving key, \texttt{python run.py --mode actual --domain all}
+reruns the experiment from item download to reports. Decoding at temperature~0 through a
+hosted inference API is not bit-reproducible in practice, which is why the traces are
+released rather than leaving a reader to reproduce them call by call; every statistic in the
+paper is recomputable from those traces offline. Science records carry no GPQA-Diamond item
+text, and Appendix~\ref{app:release} states what is released, under which terms, and why.
+
 \FloatBarrier
 \begin{thebibliography}{11}
 \small
