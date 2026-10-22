@@ -127,7 +127,15 @@ if __name__ == "__main__":
     parser.add_argument("--mode", type=str, choices=["pilot", "actual"], default="pilot")
     parser.add_argument("--domain", type=str, choices=["all", "math", "code", "science"], default="all")
     parser.add_argument("--overwrite", action="store_true", help="Delete existing output and start fresh")
-    parser.add_argument("--no_sanitize_gpqa", dest="sanitize_gpqa", action="store_false", default=True, help="Keep raw GPQA questions in generated output (default: sanitize for release)")
+    parser.add_argument(
+        "--sanitize_gpqa",
+        dest="sanitize_gpqa",
+        action="store_true",
+        default=False,
+        help="Write the generated records with question text withheld. Off by default: "
+        "verify.py needs the question, and release redaction is a separate step "
+        "(python src/redact_release.py).",
+    )
     args = parser.parse_args()
 
     is_pilot = args.mode == "pilot"

@@ -181,9 +181,13 @@ def redact(data_dir, reports_dir):
 
 
 def check(data_dir, reports_dir):
-    """Return a list of (path, problem) for anything that still carries item text."""
+    """Return a list of (path, problem) for anything that still carries item text.
+
+    Only the released files are checked. Pilot artifacts (`*_pilot.jsonl`) are regenerated
+    locally by a path-B run, are gitignored, and are never part of the release.
+    """
     problems = []
-    for suffix in (".jsonl", "_pilot.jsonl"):
+    for suffix in (".jsonl",):
         for kind, fields in (
             ("raw", SCIENCE_FIELDS_TO_DROP),
             ("generated", SCIENCE_FIELDS_TO_DROP),
@@ -225,7 +229,7 @@ def check(data_dir, reports_dir):
                         if isinstance(value, str) and value and "[WITHHELD" not in value:
                             problems.append((path, f"{row.get('item_id')} still has '{field}'"))
     for root, _, files in os.walk(reports_dir):
-        if f"{os.sep}probes{os.sep}" in root:
+        if f"{os.sep}probes{os.sep}" in root or f"{os.sep}pilot{os.sep}" in root:
             continue
         for name in files:
             if not name.endswith(".csv"):
