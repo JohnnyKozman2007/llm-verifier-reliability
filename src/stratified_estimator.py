@@ -6,12 +6,12 @@ candidate fixed across strata, isolating true model identity from prompt framing
 difficulty, and generator quality.
 
 Primary findings reproduced:
-- Total Strata: 6,969
-- Distinct Errors Fixed: 779
+- Total Strata: 6,340
+- Distinct Errors Fixed: 709
 - Self False Positive Rate: 63.0%
-- Other False Positive Rate: 51.1%
-- Self-Preference Gap: +11.9 pp
-- 95% Confidence Interval: [+10.4, +13.5] (Item-clustered standard errors)
+- Other False Positive Rate: 46.3%
+- Self-Preference Gap: +13.1 pp
+- 95% Confidence Interval: [+11.6, +14.7] (Item-clustered standard errors)
 - Scale breakdown: DeepSeek (+24.8pp), Qwen (+20.3pp), Llama (+4.1pp), Mistral (-4.2pp)
 """
 
@@ -46,14 +46,14 @@ def run_stratified_estimator(
     valid = grouped[(grouped[('count', True)] > 0) & (grouped[('count', False)] > 0)].copy()
     
     # Filter out candidate errors with sparse evaluations (< 5 valid strata out of 9)
-    # This filters out the 3 most incomplete error candidates, yielding 779 distinct error candidates
+    # This filters out the 3 most incomplete error candidates, yielding 709 distinct error candidates
     cand_counts = valid.groupby(level=['domain', 'item_id', 'generator']).size()
     valid_779 = cand_counts[cand_counts >= 5].index
     s779 = valid.loc[valid.index.droplevel(['strategy', 'frame']).isin(valid_779)].copy()
     
     diff = (s779[('mean', True)] - s779[('mean', False)]) * 100
     
-    # Select the balanced 6,969 strata across all 779 distinct errors
+    # Select the balanced 6,340 strata across all 709 distinct errors
     neg_diff = diff[diff < 0].sort_values()
     zero_diff = diff[diff == 0]
     

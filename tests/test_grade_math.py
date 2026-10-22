@@ -142,5 +142,46 @@ class DegenerateInputs(unittest.TestCase):
         self.assertFalse(grade_math("I am not sure how to solve this.", r"\boxed{5}"))
 
 
+class SemanticEquivalence(unittest.TestCase):
+    """Audit-driven regression tests: 76 of the 264 candidates the old grader
+    labeled incorrect were semantically correct (71 LaTeX-fraction vs
+    plain-fraction format, 5 sqrt/pi notation). The comparison step must accept
+    these while still rejecting genuinely wrong answers."""
+
+    def test_latex_fraction_gt_vs_plain_fraction_answer(self):
+        self.assertTrue(grade_math(r"<answer>13/51</answer>", r"\boxed{\frac{13}{51}}"))
+
+    def test_unreduced_fraction_matches(self):
+        self.assertTrue(grade_math(r"<answer>20/1296</answer>", r"\boxed{\frac{5}{324}}"))
+
+    def test_decimal_vs_fraction(self):
+        self.assertTrue(grade_math(r"<answer>0.5</answer>", r"\boxed{\frac{1}{2}}"))
+
+    def test_negative_fraction(self):
+        self.assertTrue(grade_math(r"<answer>-33/65</answer>", r"\boxed{-\frac{33}{65}}"))
+
+    def test_dfrac_ground_truth(self):
+        self.assertTrue(grade_math(r"<answer>1/462</answer>", r"\boxed{\dfrac{1}{462}}"))
+
+    def test_plain_sqrt_vs_latex_sqrt(self):
+        self.assertTrue(grade_math(r"<answer>sqrt(2)</answer>", r"\boxed{\sqrt{2}}"))
+
+    def test_coefficient_sqrt_notation(self):
+        self.assertTrue(grade_math(r"<answer>2sqrt(6)</answer>", r"\boxed{2 \sqrt{6}}"))
+
+    def test_pi_notation(self):
+        self.assertTrue(grade_math(r"<answer>50pi</answer>", r"\boxed{50 \pi}"))
+
+    def test_wrong_fraction_still_fails(self):
+        self.assertFalse(grade_math(r"<answer>14/51</answer>", r"\boxed{\frac{13}{51}}"))
+
+    def test_wrong_sqrt_still_fails(self):
+        self.assertFalse(grade_math(r"<answer>sqrt(3)</answer>", r"\boxed{\sqrt{2}}"))
+
+    def test_fraction_in_working_still_does_not_count(self):
+        text = r"First we get \frac{13}{51} of the way, then the answer is 5."
+        self.assertFalse(grade_math(text, r"\boxed{\frac{13}{51}}"))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -5,76 +5,76 @@
 ## Highest Accuracy by Domain
 ![Accuracy Plot](../../../plots/actual/math/actual_math_accuracy_by_domain.png)
 
-- **Math**: deepseek (Frame: neutral, Strategy: rubric) achieved **69.2%** accuracy (**69.2% Adjusted**).
+- **Math**: deepseek (Frame: neutral, Strategy: rubric) achieved **80.8%** accuracy (**80.8% Adjusted**).
 
 ## Model Preferences by Domain (Best Configurations)
 ### Math
-- **deepseek**: Prefers **neutral** frame & **rubric** strategy (**69.2%**)
-- **llama**: Prefers **self** frame & **cot** strategy (**66.0%**)
-- **mistral**: Prefers **other** frame & **rubric** strategy (**59.5%**)
-- **qwen**: Prefers **other** frame & **direct** strategy (**67.3%**)
+- **deepseek**: Prefers **neutral** frame & **rubric** strategy (**80.8%**)
+- **llama**: Prefers **self** frame & **cot** strategy (**78.7%**)
+- **mistral**: Prefers **other** frame & **rubric** strategy (**71.2%**)
+- **qwen**: Prefers **other** frame & **direct** strategy (**79.7%**)
 
 ## Strategy Performance per Model (Raw Accuracy)
 | Model | cot | direct | rubric |
 |-------|---|---|---|
-| **deepseek** | 68.4% | 67.5% | 68.6% |
-| **llama** | 65.6% | 64.7% | 64.7% |
-| **mistral** | 58.4% | 57.9% | 58.9% |
-| **qwen** | 66.2% | 66.8% | 66.4% |
+| **deepseek** | 80.1% | 79.4% | 80.2% |
+| **llama** | 78.2% | 77.4% | 77.4% |
+| **mistral** | 70.9% | 70.6% | 70.6% |
+| **qwen** | 78.3% | 79.4% | 78.8% |
 
 ## Strategy Performance per Model (Adjusted Accuracy)
 | Model | cot | direct | rubric |
 |-------|---|---|---|
-| **deepseek** | 68.4% | 67.5% | 68.6% |
-| **llama** | 65.6% | 64.7% | 64.7% |
-| **mistral** | 58.4% | 57.9% | 58.9% |
-| **qwen** | 66.2% | 66.8% | 66.4% |
+| **deepseek** | 80.1% | 79.4% | 80.2% |
+| **llama** | 78.2% | 77.4% | 77.4% |
+| **mistral** | 70.9% | 70.6% | 70.6% |
+| **qwen** | 78.3% | 79.4% | 78.8% |
 
 ## 1. Comprehensive Accuracy Breakdown (Raw)
 ### Overall Average Across Everything
-- **Overall**: 64.5%
+- **Overall**: 76.8%
 ### By Domain
-- **Math**: 64.5%
+- **Math**: 76.8%
 ### By Strategy
-- **cot**: 64.6%
-- **direct**: 64.2%
-- **rubric**: 64.7%
+- **cot**: 76.9%
+- **direct**: 76.7%
+- **rubric**: 76.7%
 ### By Ownership Frame
-- **neutral**: 64.4%
-- **other**: 64.6%
-- **self**: 64.6%
+- **neutral**: 76.6%
+- **other**: 76.8%
+- **self**: 76.9%
 ### By Model
-- **deepseek**: 68.1%
-- **llama**: 65.0%
-- **mistral**: 58.4%
-- **qwen**: 66.5%
+- **deepseek**: 79.9%
+- **llama**: 77.7%
+- **mistral**: 70.7%
+- **qwen**: 78.8%
 ### Top 3 Best Ownership + Strategy Combos
-- **other + cot**: 64.8%
-- **self + cot**: 64.8%
-- **other + rubric**: 64.8%
+- **self + cot**: 77.1%
+- **other + rubric**: 76.8%
+- **other + cot**: 76.8%
 
 ## 1b. Comprehensive Accuracy Breakdown (Adjusted)
 ### Overall Average Across Everything
-- **Overall**: 64.5%
+- **Overall**: 76.8%
 ### By Domain
-- **Math**: 64.5%
+- **Math**: 76.8%
 ### By Strategy
-- **cot**: 64.6%
-- **direct**: 64.2%
-- **rubric**: 64.7%
+- **cot**: 76.9%
+- **direct**: 76.7%
+- **rubric**: 76.7%
 ### By Ownership Frame
-- **neutral**: 64.4%
-- **other**: 64.6%
-- **self**: 64.6%
+- **neutral**: 76.6%
+- **other**: 76.8%
+- **self**: 76.9%
 ### By Model
-- **deepseek**: 68.1%
-- **llama**: 65.0%
-- **mistral**: 58.4%
-- **qwen**: 66.5%
+- **deepseek**: 79.9%
+- **llama**: 77.7%
+- **mistral**: 70.7%
+- **qwen**: 78.8%
 ### Top 3 Best Ownership + Strategy Combos
-- **other + cot**: 64.8%
-- **self + cot**: 64.8%
-- **other + rubric**: 64.8%
+- **self + cot**: 77.1%
+- **other + rubric**: 76.8%
+- **other + cot**: 76.8%
 
 ## 2. Formatting Failure Rates (NaN / Instructions Missed)
 ### Overall Average Across Everything
@@ -124,45 +124,45 @@
 
 ## 5. Verifier Behavior Rates
 ### Overall Averages
-- **Overall** -> Caught: 26.4% | Passed: 73.6% | Introduced: 5.6% | Confirmed: 94.4%
+- **Overall** -> Caught: 36.5% | Passed: 63.5% | Introduced: 4.8% | Confirmed: 95.2%
 ### By Domain
-- **math** -> Caught: 26.4% | Passed: 73.6% | Introduced: 5.6% | Confirmed: 94.4%
+- **math** -> Caught: 36.5% | Passed: 63.5% | Introduced: 4.8% | Confirmed: 95.2%
 ### By Strategy
-- **cot** -> Caught: 26.5% | Passed: 73.5% | Introduced: 5.4% | Confirmed: 94.6%
-- **direct** -> Caught: 24.9% | Passed: 75.1% | Introduced: 4.8% | Confirmed: 95.2%
-- **rubric** -> Caught: 27.8% | Passed: 72.2% | Introduced: 6.4% | Confirmed: 93.6%
+- **cot** -> Caught: 36.6% | Passed: 63.4% | Introduced: 4.7% | Confirmed: 95.3%
+- **direct** -> Caught: 34.6% | Passed: 65.4% | Introduced: 4.1% | Confirmed: 95.9%
+- **rubric** -> Caught: 38.2% | Passed: 61.8% | Introduced: 5.7% | Confirmed: 94.3%
 ### By Ownership Frame
-- **neutral** -> Caught: 25.6% | Passed: 74.4% | Introduced: 5.2% | Confirmed: 94.8%
-- **other** -> Caught: 27.1% | Passed: 72.9% | Introduced: 5.9% | Confirmed: 94.1%
-- **self** -> Caught: 26.5% | Passed: 73.5% | Introduced: 5.6% | Confirmed: 94.4%
+- **neutral** -> Caught: 35.3% | Passed: 64.7% | Introduced: 4.5% | Confirmed: 95.5%
+- **other** -> Caught: 37.3% | Passed: 62.7% | Introduced: 5.2% | Confirmed: 94.8%
+- **self** -> Caught: 36.7% | Passed: 63.3% | Introduced: 4.8% | Confirmed: 95.2%
 ### By Model
-- **deepseek** -> Caught: 40.9% | Passed: 59.1% | Introduced: 10.4% | Confirmed: 89.6%
-- **llama** -> Caught: 23.9% | Passed: 76.1% | Introduced: 2.7% | Confirmed: 97.3%
-- **mistral** -> Caught: 10.0% | Passed: 90.0% | Introduced: 3.6% | Confirmed: 96.4%
-- **qwen** -> Caught: 30.9% | Passed: 69.1% | Introduced: 5.5% | Confirmed: 94.5%
+- **deepseek** -> Caught: 56.0% | Passed: 44.0% | Introduced: 9.2% | Confirmed: 90.8%
+- **llama** -> Caught: 33.5% | Passed: 66.5% | Introduced: 2.2% | Confirmed: 97.8%
+- **mistral** -> Caught: 13.5% | Passed: 86.5% | Introduced: 3.2% | Confirmed: 96.8%
+- **qwen** -> Caught: 42.8% | Passed: 57.2% | Introduced: 4.7% | Confirmed: 95.3%
 
 ## 6. Statistical Bias (Self vs Other)
 ### Top 3 Highest Self-Preservation Biases (FPR Gap)
 *These models were most likely to falsely approve their own mistakes.*
 ![FPR Bias Plot](../../../plots/actual/math/actual_math_fpr_self_bias.png)
 
-- **mistral** (math, rubric): **+3.8%** bias
-- **mistral** (math, cot): **+2.7%** bias
-- **deepseek** (math, rubric): **+2.3%** bias
+- **mistral** (math, rubric): **+4.8%** bias
+- **deepseek** (math, rubric): **+3.2%** bias
+- **mistral** (math, cot): **+3.2%** bias
 
 ### Top 3 Highest Self-Doubt Biases (FNR Gap)
 *These models were most likely to falsely reject their own correct answers.*
 ![FNR Bias Plot](../../../plots/actual/math/actual_math_fnr_self_bias.png)
 
-- **deepseek** (math, direct): **+0.9%** bias
-- **deepseek** (math, rubric): **+0.9%** bias
-- **llama** (math, cot): **+-0.3%** bias
+- **deepseek** (math, direct): **+0.7%** bias
+- **deepseek** (math, rubric): **+0.7%** bias
+- **llama** (math, rubric): **+-0.2%** bias
 
 ### Statistical Significance (P-Values for Bias) — Raw numbers, chi-square per (verifier, domain, strategy) cell.
 *Small pilot sample sizes (~20/cell) mean most will read as not significant; that's expected at this scale.*
-- **mistral** (math, rubric): FPR Bias p=0.2592 | FNR Bias p=1.0000
-- **mistral** (math, cot): FPR Bias p=0.4001 | FNR Bias p=0.5625
-- **deepseek** (math, rubric): FPR Bias p=0.6614 | FNR Bias p=0.8182
+- **mistral** (math, rubric): FPR Bias p=0.2865 | FNR Bias p=0.8794
+- **deepseek** (math, rubric): FPR Bias p=0.5976 | FNR Bias p=0.8257
+- **mistral** (math, cot): FPR Bias p=0.4689 | FNR Bias p=0.4495
 
 ## 6b. Statistical Bias — Fuzz-Adjusted (Corrected Ground Truth)
 *Same analysis as Section 6 but using fuzz-adjusted ground truth for the code domain. Rows where the fuzzer found a `REFERENCE_BUG` (reference was wrong) or `BUG_CONFIRMED` (candidate had a real bug) are reclassified before computing FPR/FNR. For math and science domains the adjusted numbers are identical to raw. Differences between raw and adjusted in code domain reflect the impact of oracle corrections.*
@@ -170,76 +170,28 @@
 ### Top 3 Highest Adjusted Self-Preservation Biases (Adj FPR Gap)
 ![Adj FPR Bias Plot](../../../plots/actual/math/actual_math_adj_fpr_self_bias.png)
 
-- **mistral** (math, rubric): **+3.8%** adjusted bias
-- **mistral** (math, cot): **+2.7%** adjusted bias
-- **deepseek** (math, rubric): **+2.3%** adjusted bias
+- **mistral** (math, rubric): **+4.8%** adjusted bias
+- **deepseek** (math, rubric): **+3.2%** adjusted bias
+- **mistral** (math, cot): **+3.2%** adjusted bias
 
 ### Top 3 Highest Adjusted Self-Doubt Biases (Adj FNR Gap)
 ![Adj FNR Bias Plot](../../../plots/actual/math/actual_math_adj_fnr_self_bias.png)
 
-- **deepseek** (math, direct): **+0.9%** adjusted bias
-- **deepseek** (math, rubric): **+0.9%** adjusted bias
-- **llama** (math, cot): **+-0.3%** adjusted bias
+- **deepseek** (math, direct): **+0.7%** adjusted bias
+- **deepseek** (math, rubric): **+0.7%** adjusted bias
+- **llama** (math, rubric): **+-0.2%** adjusted bias
 
 ### Statistical Significance (P-Values for Adjusted Bias)
-- **mistral** (math, rubric): Adj FPR Bias p=0.2592 | Adj FNR Bias p=1.0000
-- **mistral** (math, cot): Adj FPR Bias p=0.4001 | Adj FNR Bias p=0.5625
-- **deepseek** (math, rubric): Adj FPR Bias p=0.6614 | Adj FNR Bias p=0.8182
+- **mistral** (math, rubric): Adj FPR Bias p=0.2865 | Adj FNR Bias p=0.8794
+- **deepseek** (math, rubric): Adj FPR Bias p=0.5976 | Adj FNR Bias p=0.8257
+- **mistral** (math, cot): Adj FPR Bias p=0.4689 | Adj FNR Bias p=0.4495
 
 Full adjusted bias table: `actual_math_adj_bias_metrics.csv`.
 
 ## 6c. Oracle & Fuzzing Statistics (Code Domain)
 *These rows represent code verifications where the verifier overrode a passing execution result (i.e. test passed but verifier said incorrect). The fuzzer ran differential testing on each and an LLM oracle adjudicated mismatches. This section quantifies how often the verifier was right vs. wrong, and how often the benchmark reference itself was the problem.*
 
-**Total override cases fuzzed:** 1856
-
-### Verdict Breakdown
-
-| Verdict | Count | % of Fuzzed |
-|---|---|---|
-| `BUG_CONFIRMED` | 167 | 9.0% |
-| `REFERENCE_BUG` | 15 | 0.8% |
-| `NO_DISCREPANCY` | 1430 | 77.0% |
-| `SKIPPED_PIPELINE_FAIL` | 168 | 9.1% |
-
-### REFERENCE_BUG Deep Dive (15 cases)
-*These are items where the HumanEval+ reference solution itself appears to be incorrect. The verifier's override was justified — the candidate was actually more correct than the reference.*
-
-**Affected item IDs:** code_HumanEval_126, code_HumanEval_134, code_HumanEval_17, code_HumanEval_59, code_HumanEval_78
-
-**By generator model (which model's candidate was vindicated):**
-- qwen: 8
-- deepseek: 5
-- mistral: 1
-- llama: 1
-
-### Verdicts by Verifier Model
-
-| Verifier | BUG_CONFIRMED | REFERENCE_BUG | NO_DISCREPANCY | SKIPPED_PIPELINE_FAIL |
-|---|---|---|---|---|
-| deepseek | 9 | 3 | 137 | 10 |
-| llama | 25 | 0 | 206 | 18 |
-| mistral | 129 | 12 | 1018 | 132 |
-| qwen | 4 | 0 | 69 | 8 |
-
-### Verdicts by Generator Model
-
-| Generator | BUG_CONFIRMED | REFERENCE_BUG | NO_DISCREPANCY | SKIPPED_PIPELINE_FAIL |
-|---|---|---|---|---|
-| deepseek | 41 | 5 | 436 | 40 |
-| llama | 62 | 1 | 279 | 50 |
-| mistral | 17 | 1 | 322 | 17 |
-| qwen | 47 | 8 | 393 | 61 |
-
-### Verifier Override Accuracy
-*% of overrides that were JUSTIFIED (BUG_CONFIRMED) vs. UNJUSTIFIED (NO_DISCREPANCY or REFERENCE_BUG)*
-
-| Verifier | Total Overrides | Justified (%) | Unjustified (%) | Inconclusive (%) |
-|---|---|---|---|---|
-| deepseek | 159 | 5.7% | 88.1% | 6.3% |
-| llama | 249 | 10.0% | 82.7% | 7.2% |
-| mistral | 1291 | 10.0% | 79.8% | 10.2% |
-| qwen | 81 | 4.9% | 85.2% | 9.9% |
+*(No code domain data present)*
 
 
 ## 7. Domain-Specific Validity Checks
@@ -256,7 +208,7 @@ Full table: `actual_math_domain_validity_checks.csv`.
 *(No science domain data present)*
 
 ### Math: Answer Matching
-- Math candidates are graded by boxed-answer extraction first, then numeric/exact matching. Symbolically equivalent but differently formatted answers remain a limitation to mention in the paper.
+- Math candidates are graded by final-answer extraction, then exact-rational and canonical-form matching: formatting-equivalent answers (plain vs. LaTeX fractions, reduced or not, decimal equivalents, sqrt/pi notation) are accepted. Algebraically equivalent but structurally different rewrites (e.g. factored vs. expanded forms) remain a limitation to mention in the paper.
 - **Math Verification Rows**: 21600
 
 ## 8. Belief vs. Reality (Told Frame vs. Actual Authorship)
@@ -264,39 +216,39 @@ Full table: `actual_math_domain_validity_checks.csv`.
 
 | Verifier | Told Frame | Actually Self-Authored? | Accuracy | FPR |
 |---|---|---|---|---|
-| deepseek | other | No | 69.9% | 54.3% |
-| deepseek | other | Yes | 64.2% | 70.6% |
-| deepseek | self | No | 69.0% | 55.6% |
-| deepseek | self | Yes | 64.0% | 71.1% |
-| llama | other | No | 62.0% | 73.5% |
-| llama | other | Yes | 72.4% | 93.3% |
-| llama | self | No | 63.3% | 71.4% |
-| llama | self | Yes | 72.9% | 91.7% |
-| mistral | other | No | 62.9% | 89.9% |
-| mistral | other | Yes | 45.8% | 86.0% |
-| mistral | self | No | 62.9% | 91.4% |
-| mistral | self | Yes | 43.8% | 89.2% |
-| qwen | other | No | 68.4% | 62.2% |
-| qwen | other | Yes | 61.8% | 86.8% |
-| qwen | self | No | 67.9% | 64.0% |
-| qwen | self | Yes | 62.7% | 85.2% |
+| deepseek | other | No | 80.4% | 39.3% |
+| deepseek | other | Yes | 79.1% | 56.6% |
+| deepseek | self | No | 79.8% | 40.9% |
+| deepseek | self | Yes | 78.9% | 57.4% |
+| llama | other | No | 74.4% | 64.7% |
+| llama | other | Yes | 85.8% | 86.7% |
+| llama | self | No | 75.8% | 61.9% |
+| llama | self | Yes | 86.2% | 83.3% |
+| mistral | other | No | 76.7% | 84.7% |
+| mistral | other | Yes | 53.3% | 84.4% |
+| mistral | self | No | 76.8% | 86.9% |
+| mistral | self | Yes | 51.8% | 87.7% |
+| qwen | other | No | 80.5% | 48.1% |
+| qwen | other | Yes | 74.4% | 81.1% |
+| qwen | self | No | 80.3% | 50.2% |
+| qwen | self | Yes | 75.3% | 78.8% |
 
 Read this as 2x2 per verifier: (told self / actually self) vs (told self / actually other) vs (told other / actually self) vs (told other / actually other). A gap between the first two rows (same actual authorship, different label) isolates the pure *belief* effect. A gap between rows 1 and 3 (same label, different truth) isolates the pure *reality* effect. Full data: `actual_math_belief_vs_reality.csv`.
 
 ## 9. Confusion Matrices (Visuals & Raw Data)
 ### deepseek
-**True Positives:** 2708 | **False Positives:** 1404 | **True Negatives:** 972 | **False Negatives:** 316
+**True Positives:** 3367 | **False Positives:** 745 | **True Negatives:** 947 | **False Negatives:** 341
 
 ![Confusion Matrix deepseek](../../../plots/actual/math/actual_math_confusion_matrix_deepseek.png)
 ### llama
-**True Positives:** 2943 | **False Positives:** 1809 | **True Negatives:** 567 | **False Negatives:** 81
+**True Positives:** 3627 | **False Positives:** 1125 | **True Negatives:** 567 | **False Negatives:** 81
 
 ![Confusion Matrix llama](../../../plots/actual/math/actual_math_confusion_matrix_llama.png)
 ### mistral
-**True Positives:** 2915 | **False Positives:** 2138 | **True Negatives:** 238 | **False Negatives:** 109
+**True Positives:** 3589 | **False Positives:** 1464 | **True Negatives:** 228 | **False Negatives:** 119
 
 ![Confusion Matrix mistral](../../../plots/actual/math/actual_math_confusion_matrix_mistral.png)
 ### qwen
-**True Positives:** 2857 | **False Positives:** 1642 | **True Negatives:** 734 | **False Negatives:** 167
+**True Positives:** 3532 | **False Positives:** 967 | **True Negatives:** 725 | **False Negatives:** 176
 
 ![Confusion Matrix qwen](../../../plots/actual/math/actual_math_confusion_matrix_qwen.png)

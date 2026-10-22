@@ -12,6 +12,7 @@ Capability Nor Strategy: What Brings a Verifier to Reliability"**
 - `data/` benchmark items, candidates, verification traces, fuzzing results
 - `reports/` summary CSVs and probe reports; `plots/` figures
 - `prompts/` rewrite prompts used in the style-transfer probe
+- `paper/` workshop paper sources (numbers aligned with the corrected MATH grader)
 
 GPQA-Diamond question text is withheld per the dataset's terms; `python src/data_loader.py`
 (with `HF_TOKEN`) restores it.
@@ -22,7 +23,7 @@ python -m venv venv && source venv/bin/activate   # Windows: venv\Scripts\activa
 pip install -r requirements.txt
 cp .env.example .env                              # add DEEPINFRA_API_KEY (and HF_TOKEN for GPQA)
 python preflight_check.py
-python src/stratified_estimator.py                # headline +11.9 pp self-preference gap
+python src/stratified_estimator.py                # headline +13.1 pp self-preference gap
 python run.py --mode actual --domain all          # full pipeline (needs API access)
 python src/report.py --mode actual --domains all
 python src/probes/analysis_ensemble.py            # other probes live in src/probes/
