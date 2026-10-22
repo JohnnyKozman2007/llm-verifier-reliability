@@ -88,21 +88,22 @@ class ScienceQuestionRenderingTests(unittest.TestCase):
         self.assertEqual(extract_option_map_from_question(rendered), OPTION_MAP)
 
     def test_extract_multiline_option_map(self):
+        # Synthetic text on purpose: real GPQA options must never be copied into the repo.
         question = (
-            "Which reagent sequence is correct?\n"
+            "Which step sequence is correct?\n"
             "Options:\n"
-            "A. 1. Zn, ether\n"
-            "   2. HCl\n"
-            "B. 1. NaBH4\n"
-            "   2. H2O\n"
-            "C. Heat only\n"
-            "D. No reaction\n"
+            "A. 1. reagent alpha\n"
+            "   2. reagent beta\n"
+            "B. 1. reagent gamma\n"
+            "   2. solvent delta\n"
+            "C. heat only\n"
+            "D. no reaction\n"
         )
         option_map = extract_option_map_from_question(question)
         self.assertEqual(set(option_map.keys()), {"A", "B", "C", "D"})
-        self.assertIn("Zn, ether", option_map["A"])
-        self.assertIn("HCl", option_map["A"])
-        self.assertIn("NaBH4", option_map["B"])
+        self.assertIn("reagent alpha", option_map["A"])
+        self.assertIn("reagent beta", option_map["A"])
+        self.assertIn("reagent gamma", option_map["B"])
 
 
 class ScienceAnswerParsingTests(unittest.TestCase):

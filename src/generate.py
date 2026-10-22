@@ -3,22 +3,24 @@ import json
 import asyncio
 from models import generate_response, MODELS
 from prompts import get_generation_prompt
+from science_utils import SCIENCE_WITHHELD_PLACEHOLDER as WITHHELD
 
 RAW_DATA_DIR = os.path.join("data", "raw")
 GEN_DATA_DIR = os.path.join("data", "generated")
 os.makedirs(GEN_DATA_DIR, exist_ok=True)
 
 def sanitize_science_item(item):
-    """Sanitizes GPQA-Diamond questions to comply with anti-leakage terms."""
+    """Write the generated record with its question text withheld.
+
+    Options and candidates are deliberately kept here: verify.py consumes the candidates
+    and needs them intact to run. Release redaction happens once, in src/redact_release.py,
+    after the pipeline has finished.
+    """
     clean = dict(item)
-    withheld_msg = (
-        "[WITHHELD: GPQA-Diamond benchmark questions cannot be posted in plain text per curator terms. "
-        "Reconstruct using src/data_loader.py with HF_TOKEN]"
-    )
     if "question" in clean:
-        clean["question"] = withheld_msg
+        clean["question"] = WITHHELD
     if "question_stem" in clean:
-        clean["question_stem"] = withheld_msg
+        clean["question_stem"] = WITHHELD
     return clean
 
 async def generate_for_item(item, domain):
@@ -125,7 +127,15 @@ if __name__ == "__main__":
     parser.add_argument("--mode", type=str, choices=["pilot", "actual"], default="pilot")
     parser.add_argument("--domain", type=str, choices=["all", "math", "code", "science"], default="all")
     parser.add_argument("--overwrite", action="store_true", help="Delete existing output and start fresh")
-    parser.add_argument("--no_sanitize_gpqa", dest="sanitize_gpqa", action="store_false", default=True, help="Keep raw GPQA questions in generated output (default: sanitize for release)")
+    parser.add_argument(
+        "--sanitize_gpqa",
+        dest="sanitize_gpqa",
+        action="store_true",
+        default=False,
+        help="Write the generated records with question text withheld. Off by default: "
+        "verify.py needs the question, and release redaction is a separate step "
+        "(python src/redact_release.py).",
+    )
     args = parser.parse_args()
 
     is_pilot = args.mode == "pilot"

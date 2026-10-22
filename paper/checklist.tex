@@ -49,7 +49,7 @@
     \item {\bf Experimental result reproducibility}
     \item[] Question: Does the paper fully disclose all the information needed to reproduce the main experimental results of the paper to the extent that it affects the main claims and/or conclusions of the paper (regardless of whether the code and data are provided or not)?
     \item[] Answer: \answerYes{}
-    \item[] Justification: All models, benchmarks, prompts, inference settings (temperature 0), and the full $4{\times}4{\times}3{\times}3$ experimental design are specified in Sections~\ref{sec:setup} and~\ref{sec:results}, with the complete code, prompts, and verification traces released in an anonymized supplementary archive.
+    \item[] Justification: All models, benchmarks, prompts, inference settings (temperature 0), and the full $4{\times}4{\times}3{\times}3$ experimental design are specified in Sections~\ref{sec:setup} and~\ref{sec:results}, with the complete code, prompts, and verification traces released in an anonymized supplementary archive. Science traces are released without GPQA-Diamond item text (identifiers, answer letters, parse metadata and verdicts only), because the curators ask that examples not be posted in plain text; they still regenerate every reported number offline, as Section~\ref{sec:repro-statement} and Appendix~\ref{app:release} describe.
     \item[] Guidelines:
     \begin{itemize}
         \item The answer \answerNA{} means that the paper does not include experiments.
@@ -164,7 +164,7 @@
 \item {\bf Licenses for existing assets}
     \item[] Question: Are the creators or original owners of assets (e.g., code, data, models), used in the paper, properly credited and are the license and terms of use explicitly mentioned and properly respected?
     \item[] Answer: \answerYes{}
-    \item[] Justification: The paper cites the original works and states their licenses in Section~\ref{sec:setup}: HumanEval+/EvalPlus (Apache-2.0, built on OpenAI's HumanEval under MIT), MATH (MIT), and GPQA-Diamond (CC BY-4.0, accessed under its gated-release terms). All assets are used within their terms for academic research.
+    \item[] Justification: The paper cites the original works and states their licenses in Section~\ref{sec:setup}: HumanEval+/EvalPlus (Apache-2.0, built on OpenAI's HumanEval under MIT), MATH (MIT), and GPQA-Diamond (CC BY-4.0, accessed under its gated-release terms). GPQA-Diamond is credited with its title, authors, source URL and license, together with the changes we made (a 150-item subsample with per-item option re-ordering), and no GPQA-Diamond item text is redistributed (Appendix~\ref{app:release}). Our own release states its licenses too: MIT for the code and CC BY 4.0 for the derived artifacts, as stated in the repository's \texttt{LICENSE} file. All assets are used within their terms for academic research.
     \item[] Guidelines:
     \begin{itemize}
         \item The answer \answerNA{} means that the paper does not use existing assets.
@@ -180,7 +180,7 @@
 \item {\bf New assets}
     \item[] Question: Are new assets introduced in the paper well documented and is the documentation provided alongside the assets?
     \item[] Answer: \answerYes{}
-    \item[] Justification: We release anonymized code, prompts, and the full 64{,}800 verification traces, documented in the supplemental material and the project repository.
+    \item[] Justification: We release anonymized code, prompts, and all 64{,}800 verification records, documented in the supplemental material and the project repository. Science records are released without GPQA-Diamond item text (identifiers, answer letters, parse metadata and verdicts only), so the derived artifacts redistribute no third-party dataset content; the code is licensed MIT and the derived artifacts CC BY 4.0, stated in the repository \texttt{LICENSE}.
     \item[] Guidelines:
     \begin{itemize}
         \item The answer \answerNA{} means that the paper does not release new assets.
