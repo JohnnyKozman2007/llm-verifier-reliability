@@ -260,9 +260,11 @@ model is ever named. The \emph{verification strategy} requests a bare verdict
 rubric-scored assessment (\textsc{rubric}). This yields $4\times4\times3\times3 = 144$
 verifications per item and 64{,}800 in total. One verification in four has a model grading
 its own candidate: those rows are the object of study in \S\ref{sec:results-belief}, and
-are excluded from every analysis that compares judges to one another---detectability,
-oversight, and ensembling---so that self-preference cannot inflate a cross-judge
-comparison.
+are excluded from pairwise and leave-one-out cross-judge analyses (detectability,
+oversight, and our deployment-realistic 3-judge ensemble in Appendix~\ref{app:capability})
+so that self-preference cannot inflate comparative performance. For full-panel
+correlated failure analysis (Figure~\ref{fig:correlated-failure}), all four judges are evaluated
+together to test whether wrong answers fool the entire panel simultaneously.
 
 The design's essential property is that the told frame is crossed with the true
 generator--verifier identity. A judge told ``you wrote this'' is usually being misinformed,
@@ -295,7 +297,9 @@ We report the following metrics, computed at the item level throughout:
     $\to$ rejected).
   \item \textbf{Balanced accuracy}: arithmetic mean of true-positive rate (TPR,
     sensitivity) and true-negative rate (TNR, specificity),
-    $\tfrac{1}{2}(\mathrm{TPR}+\mathrm{TNR})$. This is our \emph{primary metric}.
+    $\tfrac{1}{2}(\mathrm{TPR}+\mathrm{TNR})$. While raw accuracy is reported for
+    standard benchmark comparisons, balanced accuracy serves as our primary metric
+    for class-imbalanced evaluation and ensembling decision thresholds (Appendix~\ref{app:capability}).
   \item \textbf{False-positive rate (FPR)} / \textbf{false-approval rate}: rate
     at which incorrect candidates are approved ($\mathrm{FP}/(\mathrm{FP}+\mathrm{TN})$).
   \item \textbf{False-negative rate (FNR)} / \textbf{false-rejection rate}: rate
@@ -389,19 +393,19 @@ authorship. Full probe methodology is in Appendix~\ref{app:framing}.
 \begin{table}[H]
 \centering\small
 \caption{Belief vs.\ reality, told label held at ``self''. Accuracy hides the effect;
-false approval reveals it. Llama's accuracy advantage on its own work comes from fewer
+false approval and balanced accuracy reveal it. Llama's accuracy advantage on its own work comes from fewer
 false rejections, not from catching its own errors.}
 \label{tab:belief-reality}
-\begin{tabular}{lcccc}
+\begin{tabular}{lcccccc}
 \toprule
-& \multicolumn{2}{c}{Accuracy (\%)} & \multicolumn{2}{c}{False approval (\%)} \\
-\cmidrule(r){2-3}\cmidrule(l){4-5}
-Model & Actually self & Actually other & Actually self & Actually other \\
+& \multicolumn{2}{c}{Accuracy (\%)} & \multicolumn{2}{c}{Balanced acc (\%)} & \multicolumn{2}{c}{False approval (\%)} \\
+\cmidrule(r){2-3}\cmidrule(lr){4-5}\cmidrule(l){6-7}
+Model & Actually self & Actually other & Actually self & Actually other & Actually self & Actually other \\
 \midrule
-DeepSeek & 76.4 & 78.3 & 55.5 & 30.7 \\
-Qwen     & 72.7 & 77.5 & 63.7 & 42.5 \\
-Llama    & 78.7 & 75.3 & 49.0 & 46.1 \\
-Mistral  & 59.5 & 69.0 & 62.5 & 64.3 \\
+DeepSeek & 76.4 & 78.3 & 68.1 & 77.0 & 55.5 & 30.7 \\
+Qwen     & 72.7 & 77.5 & 64.4 & 74.3 & 63.7 & 42.5 \\
+Llama    & 78.7 & 75.3 & 72.0 & 72.0 & 49.0 & 46.1 \\
+Mistral  & 59.5 & 69.0 & 62.0 & 60.9 & 62.5 & 64.3 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -453,7 +457,7 @@ domain breakdown); in code the same relationship is flat and
 non-significant ($p=0.064$) (Figure~\ref{fig:detectability}). Judges also fail
 together rather than independently in ungrounded domains---mean pairwise agreement is
 $\kappa=+0.36$ in science and $+0.40$ in math, against $+0.09$ in code, and wrong
-answers fool all four judges simultaneously roughly 2.9$\times$ more often than chance
+answers fool all four judges simultaneously (full panel) roughly 2.9$\times$ more often than chance
 in science and 2.4$\times$ in math, with no such excess in code
 (Figure~\ref{fig:correlated-failure}). This correlation is why neither standard fix
 helps where it is needed most: no ensemble threshold beats the best single judge in
@@ -473,7 +477,7 @@ by domain. Science and math rise significantly ($p<0.001$); code stays flat
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.48\textwidth]{figures/4_correlated_failure.png}
-\caption{Wrong answers approved by all four judges, observed vs.\ expected under
+\caption{Wrong answers approved by all four judges (full panel including generator), observed vs.\ expected under
 independence, by domain.}
 \label{fig:correlated-failure}
 \end{figure}
