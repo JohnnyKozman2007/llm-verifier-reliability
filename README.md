@@ -2,7 +2,7 @@
 
 Code, prompts, and verification traces for **"Neither Blinding Nor a Jury, Neither
 Capability Nor Strategy: What Brings a Verifier to Reliability"**
-(Verify-Agents Workshop, NeurIPS 2026).
+(Workshop on Who Verifies the Agents? Toward Reliable Agent Development, NeurIPS 2026).
 
 64,800 verification calls: 4 generators x 4 verifiers x 3 authorship frames x 3 strategies,
 over 3 domains (HumanEval+, MATH, GPQA-Diamond) of 150 items each.
@@ -28,7 +28,16 @@ HumanEval+/EvalPlus (Apache-2.0, built on OpenAI's HumanEval under MIT), MATH (M
 GPQA-Diamond (CC BY 4.0). GPQA-Diamond is credited in the paper as
 *GPQA: A Graduate-Level Google-Proof Q&A Benchmark*, Rein et al. (2024),
 https://github.com/idavidrein/gpqa, with our changes stated: a 150-item subsample and
-per-item option re-ordering. See `LICENSE`.
+per-item option re-ordering. See `LICENSE`, and `THIRD_PARTY_NOTICES.md` for the upstream
+licence notices that travel with the copied MATH and HumanEval+ items.
+
+The traces also contain outputs of the models that were run, each under its own terms:
+Qwen2.5-72B-Instruct (Qwen License), DeepSeek-V3 (DeepSeek Model License),
+Llama-3.3-70B-Instruct (Llama 3.3 Community License), Mistral-Nemo-Instruct-2407 and
+Mixtral-8x7B-Instruct-v0.1 (Apache-2.0), Gemma-2-27B-it (Gemma Terms of Use), and
+WizardLM-2-8x22B (Apache-2.0 per its release model card; the official page is no longer
+public). They are released for research on verifier reliability; no model was trained on
+them.
 
 ## Reproduce
 ```bash
@@ -88,14 +97,14 @@ Delete that file only if you mean to re-grade code from scratch.
 
 ## Citation
 ```bibtex
-@inproceedings{kozman2026neither,
-  title     = {Neither Blinding Nor a Jury, Neither Capability Nor Strategy:
-               What Brings a Verifier to Reliability},
-  author    = {Kozman, Johnny and Parajuli, Tilak and Waddepalli, Arushi},
-  booktitle = {Workshop on Who Verifies the Agents? Toward Reliable Agent Development,
-               NeurIPS 2026},
-  year      = {2026},
-  url       = {https://github.com/JohnnyKozman2007/llm-verifier-reliability}
+@misc{kozman2026neither,
+  title        = {Neither Blinding Nor a Jury, Neither Capability Nor Strategy:
+                  What Brings a Verifier to Reliability},
+  author       = {Kozman, Johnny and Parajuli, Tilak and Waddepalli, Arushi},
+  year         = {2026},
+  howpublished = {Workshop on Who Verifies the Agents? Toward Reliable Agent Development,
+                  NeurIPS 2026},
+  url          = {https://github.com/JohnnyKozman2007/llm-verifier-reliability}
 }
 ```
 The same metadata is in `CITATION.cff`.

@@ -16,7 +16,7 @@ authors:
     given-names: Arushi
     affiliation: "Indian Institute of Information Technology, Lucknow"
 preferred-citation:
-  type: conference-paper
+  type: generic
   title: "Neither Blinding Nor a Jury, Neither Capability Nor Strategy: What Brings a Verifier to Reliability"
   authors:
     - family-names: Kozman
@@ -25,6 +25,6 @@ preferred-citation:
       given-names: Tilak
     - family-names: Waddepalli
       given-names: Arushi
-  collection-title: "Workshop on Who Verifies the Agents? Toward Reliable Agent Development, NeurIPS 2026"
+  notes: "Workshop on Who Verifies the Agents? Toward Reliable Agent Development, NeurIPS 2026"
   year: 2026
   url: "https://github.com/JohnnyKozman2007/llm-verifier-reliability"
