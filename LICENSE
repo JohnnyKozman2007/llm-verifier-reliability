@@ -10,8 +10,9 @@ This repository contains two kinds of material and they are licensed separately.
    (CC BY 4.0), https://creativecommons.org/licenses/by/4.0/.
    These files are derived from third-party benchmarks, which keep their own
    terms: HumanEval+/EvalPlus (Apache-2.0, built on OpenAI's HumanEval under MIT),
-   MATH (MIT), and GPQA-Diamond (CC BY 4.0). No GPQA-Diamond item text is
-   redistributed here; see README.md.
+   MATH (MIT), and GPQA-Diamond (CC BY 4.0). Copied benchmark items stay under
+   those terms, and their licence notices are reproduced in THIRD_PARTY_NOTICES.md.
+   No GPQA-Diamond item text is redistributed here; see README.md.
 
 MIT License
 
