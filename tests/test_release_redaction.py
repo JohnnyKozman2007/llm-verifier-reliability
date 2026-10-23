@@ -21,7 +21,7 @@ from science_utils import SCIENCE_WITHHELD_PLACEHOLDER, is_withheld
 class TestReleaseIsRedacted(unittest.TestCase):
     def test_committed_release_has_no_item_text(self):
         problems = redact_release.check(os.path.join(ROOT, "data"), os.path.join(ROOT, "reports"))
-        self.assertEqual(problems, [], f"released artifacts still carry GPQA text: {problems[:5]}")
+        self.assertEqual(problems, [], f"released artifacts still carry GPQA text or local paths: {problems[:5]}")
 
 
 class TestRedactor(unittest.TestCase):
@@ -106,6 +106,30 @@ class TestRedactor(unittest.TestCase):
         problems = redact_release.check(self.tmp, os.path.join(self.tmp, "reports"))
         self.assertTrue(problems)
         self.assertTrue(any("options" in problem for _, problem in problems))
+
+    def test_local_paths_are_scrubbed_from_validation_traces(self):
+        validated = os.path.join(self.tmp, "validated")
+        os.makedirs(validated, exist_ok=True)
+        path = os.path.join(validated, "code_overrides.jsonl")
+        rows = [
+            {"item_id": "code_0", "fuzz_note": 'File "C:\\Users\\someone\\AppData\\Local\\Temp\\tmpab12.py", line 3'},
+            # truncated mid-path, as some stored notes are
+            {"item_id": "code_1", "fuzz_note": 'Harness crashed: rs\\someone\\AppData\\Local\\Temp\\tmpcd34.py", line 3'},
+            {"item_id": "code_2", "fuzz_note": "no path here"},
+        ]
+        with open(path, "w", encoding="utf-8") as f:
+            for row in rows:
+                f.write(json.dumps(row) + "\n")
+        reports = os.path.join(self.tmp, "reports")
+        self.assertEqual(len(redact_release.check(self.tmp, reports)), 2)
+
+        redact_release.redact_local_paths(validated)
+        with open(path, "r", encoding="utf-8") as f:
+            text = f.read()
+        self.assertNotIn("someone", text)
+        self.assertIn("tmpab12.py", text, "only the directory is local; the file name stays")
+        self.assertIn('{"item_id": "code_2", "fuzz_note": "no path here"}\n', text)
+        self.assertEqual(redact_release.check(self.tmp, reports), [])
 
 
 if __name__ == "__main__":

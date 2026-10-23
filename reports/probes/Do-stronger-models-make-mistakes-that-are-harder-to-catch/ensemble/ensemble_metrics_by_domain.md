@@ -14,9 +14,9 @@ Leave-one-out 3-judge panel (evaluating candidates with non-author models).
 
 | Strategy | Decision Rule | Balanced Accuracy | Raw Accuracy | Catch (TNR) | Confirm (TPR) | FPR | Precision | F1 | Best Single Judge |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| `cot` | **1-of-3** | **62.8%** | 76.6% | 26.7% | 99.0% | 73.3% | 75.1% | 0.8540 | deepseek (74.6%) |
-| `cot` | **2-of-3** | **68.2%** | 79.1% | 39.8% | 96.7% | 60.2% | 78.2% | 0.8646 | deepseek (74.6%) |
-| `cot` | **3-of-3** | **73.3%** | 79.6% | 56.8% | 89.8% | 43.2% | 82.3% | 0.8589 | deepseek (74.6%) |
+| `cot` | **1-of-3** | **65.4%** | 81.5% | 31.8% | 99.1% | 68.2% | 80.5% | 0.8882 | deepseek (79.3%) |
+| `cot` | **2-of-3** | **72.1%** | 84.0% | 47.3% | 96.9% | 52.7% | 84.0% | 0.8997 | deepseek (79.3%) |
+| `cot` | **3-of-3** | **79.0%** | 84.5% | 67.6% | 90.5% | 32.4% | 88.8% | 0.8965 | deepseek (79.3%) |
 
 ## Domain: CODE
 

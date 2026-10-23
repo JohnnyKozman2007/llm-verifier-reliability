@@ -30,9 +30,11 @@ def load_or_build_grades(domain, mode="actual"):
     """
     Cache grades to disk. Code grading spawns 600 subprocesses; never redo it.
 
-    Caches live in data/graded/ and are committed for reproducibility. They are
-    DERIVED from data/generated/ -- if candidates are ever regenerated, delete this
-    directory or every downstream number will be computed against stale grades.
+    Caches live in reports/probes/Do-stronger-models-make-mistakes-that-are-harder-to-catch/
+    and are committed for reproducibility; report.py reads the code labels from the same
+    file. They are DERIVED from data/generated/ -- if candidates are regenerated or a grader
+    changes, delete the affected graded_*.json or every downstream number will be computed
+    against stale grades.
     """
     suffix = "_pilot.jsonl" if mode == "pilot" else ".jsonl"
     cache_dir = os.path.join("reports", "probes", "Do-stronger-models-make-mistakes-that-are-harder-to-catch")

@@ -12,6 +12,9 @@ The release therefore keeps every number reproducible while shipping none of the
 benchmark's content. Reconstructing the items is a documented, token-gated step:
 `python src/data_loader.py --mode actual --domain science` with HF_TOKEN set.
 
+It also strips local filesystem paths from the validation traces: a traceback names the
+temp file the candidate ran from, and that path carries the operator's account name.
+
 Run this before every commit that touches data/ or reports/. It is idempotent.
 
 Usage
@@ -23,6 +26,7 @@ import argparse
 import csv
 import json
 import os
+import re
 import sys
 
 from science_utils import SCIENCE_WITHHELD_PLACEHOLDER as WITHHELD
@@ -41,6 +45,14 @@ PROBE_TEXT_TOKENS = ("text", "prompt", "response", "code", "answer", "question",
 RAW = os.path.join("data", "raw")
 GENERATED = os.path.join("data", "generated")
 VERIFIED = os.path.join("data", "verified")
+
+# C:\Users\<name>\AppData\Local\Temp\tmpXXXX.py, as recorded in validation tracebacks. Some
+# notes are truncated mid-path ("rs\<name>\AppData\..."), so the whole token up to the temp
+# directory is replaced; the temp file name itself is kept.
+LOCAL_PATH = re.compile(r'[^\s"\']*\\AppData\\Local\\Temp(?=\\)'
+                        r'|[A-Za-z]:\\Users\\[^\\\s"\']+'
+                        r'|/(?:home|Users)/[^/\s"\']+')
+LOCAL_PATH_PLACEHOLDER = "<local>"
 
 
 def _read_jsonl(path):
@@ -174,6 +186,41 @@ def redact_report_csvs(reports_dir):
     return touched
 
 
+def redact_local_paths(validated_dir):
+    """Replace local filesystem paths in the validation traces.
+
+    Only lines that carry a path are rewritten; every other line is kept byte for byte, so
+    the diff shows exactly what was scrubbed.
+    """
+    touched = {}
+    if not os.path.isdir(validated_dir):
+        return touched
+    for name in sorted(os.listdir(validated_dir)):
+        if not name.endswith(".jsonl"):
+            continue
+        path = os.path.join(validated_dir, name)
+        with open(path, "r", encoding="utf-8", newline="") as f:
+            lines = f.readlines()
+        changed = 0
+        for i, line in enumerate(lines):
+            if not line.strip():
+                continue
+            row = json.loads(line)
+            clean = {k: LOCAL_PATH.sub(LOCAL_PATH_PLACEHOLDER, v) if isinstance(v, str) else v
+                     for k, v in row.items()}
+            if clean != row:
+                ending = line[len(line.rstrip("\r\n")):]
+                lines[i] = json.dumps(clean, ensure_ascii=False) + ending
+                changed += 1
+        if changed:
+            tmp = path + ".tmp"
+            with open(tmp, "w", encoding="utf-8", newline="") as f:
+                f.writelines(lines)
+            os.replace(tmp, path)
+            touched[os.path.relpath(path)] = changed
+    return touched
+
+
 def _science_files(root, suffix):
     path = os.path.join(root, f"science{suffix}")
     return path if os.path.exists(path) else None
@@ -193,11 +240,13 @@ def redact(data_dir, reports_dir):
             summary[f"verified{suffix}"] = redact_verified(ver)
     summary.update(redact_probe_traces(reports_dir))
     summary.update(redact_report_csvs(reports_dir))
+    summary.update(redact_local_paths(os.path.join(data_dir, "validated")))
     return summary
 
 
 def check(data_dir, reports_dir):
-    """Return a list of (path, problem) for anything that still carries item text.
+    """Return a list of (path, problem) for anything that still carries item text, or a
+    local filesystem path in the validation traces.
 
     Only the released files are checked. Pilot artifacts (`*_pilot.jsonl`) are regenerated
     locally by a path-B run, are gitignored, and are never part of the release.
@@ -260,6 +309,16 @@ def check(data_dir, reports_dir):
                     text = row.get("candidate_answer_text")
                     if text and row.get("domain") == "science" and "[WITHHELD" not in text:
                         problems.append((path, "science row with candidate_answer_text"))
+    validated = os.path.join(data_dir, "validated")
+    if os.path.isdir(validated):
+        for name in sorted(os.listdir(validated)):
+            if not name.endswith(".jsonl"):
+                continue
+            path = os.path.join(validated, name)
+            for row in _read_jsonl(path):
+                for field, value in row.items():
+                    if isinstance(value, str) and LOCAL_PATH.search(value):
+                        problems.append((path, f"{row.get('item_id')} has a local path in '{field}'"))
     return problems
 
 
@@ -277,7 +336,7 @@ def main():
             for path, problem in problems[:20]:
                 print(f"  {path}: {problem}")
             sys.exit(1)
-        print("OK: no GPQA-Diamond question text or option strings in released artifacts")
+        print("OK: no GPQA-Diamond question text, option strings or local paths in released artifacts")
         return
 
     summary = redact(args.data_dir, args.reports_dir)
