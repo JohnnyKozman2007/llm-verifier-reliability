@@ -42,22 +42,22 @@ def _notes_to_string(notes):
 # in science_utils, with the two copies disagreeing about whether an ambiguous parse counts
 # as correct - keeping one implementation means that cannot drift again.
 
-def _math_values_equal(a, b, tol=1e-6):
-    """Compare two math answer strings, numerically if possible, else exact (stripped) string match."""
-    a, b = a.strip(), b.strip()
-    try:
-        return abs(float(a.replace(',', '')) - float(b.replace(',', ''))) < tol
-    except ValueError:
-        # LaTeX answers differ only by spacing: "25 + 2\\sqrt{159}" vs "25+2\\sqrt{159}"
-        return re.sub(r'\s+', '', a) == re.sub(r'\s+', '', b)
-
 def _normalize_math_string(s):
     """Strip formatting that does not change meaning: LaTeX spacing/sizing commands,
-    \\dfrac/\\tfrac -> \\frac, and all whitespace."""
+    \\dfrac/\\tfrac -> \\frac, degree marks, \\text{} wrappers, brace-less \\frac92 and
+    \\sqrt3 (one digit per argument, as LaTeX reads them), parentheses around the whole
+    answer unless it is a tuple, and all whitespace."""
     s = str(s).strip()
     s = re.sub(r'\\(?:left|right|,|;|:|!|quad|qquad|bigl|bigr|Bigl|Bigr)', '', s)
     s = s.replace('\\dfrac', '\\frac').replace('\\tfrac', '\\frac')
-    return re.sub(r'\s+', '', s)
+    s = re.sub(r'\^(?:\{\\circ\}|\\circ)', '', s)
+    s = re.sub(r'\\(?:text|mbox|mathrm)\{([^{}]*)\}', r'\1', s)
+    s = re.sub(r'\\frac(\d)(\d)', r'\\frac{\1}{\2}', s)
+    s = re.sub(r'\\sqrt(\d)', r'\\sqrt{\1}', s)
+    s = re.sub(r'\s+', '', s)
+    if re.fullmatch(r'\([^(),]*\)', s):
+        s = s[1:-1]
+    return s
 
 def _exact_number(s):
     """Exact rational value of a plain numeric answer: integers, decimals, 'a/b',
@@ -66,7 +66,8 @@ def _exact_number(s):
     Exactness matters: float() cannot parse fractions at all, which is what made
     '13/51' vs '\\frac{13}{51}' grade as incorrect (audit: 76/264 false negatives).
     """
-    s = str(s).strip().replace(',', '')
+    # Only thousands separators: '1,000' is a number, '1,2' and '-1,1,1' are tuples.
+    s = re.sub(r'(?<=\d),(?=\d{3}(?!\d))', '', str(s).strip())
     neg = s.startswith('-')
     if neg:
         s = s[1:]
@@ -99,13 +100,25 @@ def _canonical_expr(s):
     s = re.sub(r'\\sqrt\{([^{}]+)\}', r'sqrt(\1)', s)
     s = s.replace('\\times', '*').replace('\\cdot', '*').replace('\\pi', 'pi').replace('\\infty', 'inf')
     s = re.sub(r'\^\{(-?[^{}]+)\}', r'^\1', s)
+    # Parentheses around a lone number or symbol are redundant ('-(pi)/(6)' == '-pi/6')
+    # unless they mark a function argument or an implicit product: 'sqrt(2)3' and
+    # '(3)/(4)pi' keep theirs, or they would collide with 'sqrt(23)' and '(3)/(4pi)'.
+    s = re.sub(r'(?<![\w)])\((\d+(?:\.\d+)?|[A-Za-z]|pi|inf)\)(?![\w(])', r'\1', s)
     return s
+
+def _tuple_items(s):
+    """Elements of a comma-separated answer, with one optional pair of enclosing
+    parentheses: '(-1,1,1)' and '-1,1,1' both give ['-1', '1', '1']."""
+    if s.startswith('(') and s.endswith(')') and '(' not in s[1:-1]:
+        s = s[1:-1]
+    return s.split(',')
 
 def _semantic_math_equal(a, b):
     """API-free semantic equality between two math answer strings.
 
     Order: normalized exact string, then exact rational equality (fractions and
-    decimals, reduced or not), then canonical expression equality. Conservative:
+    decimals, reduced or not), then element-wise tuple equality, then canonical
+    expression equality. Conservative:
     it only absorbs formatting differences and never evaluates algebra, so it
     cannot equate two genuinely different answers.
     """
@@ -116,6 +129,10 @@ def _semantic_math_equal(a, b):
     av, bv = _exact_number(a), _exact_number(b)
     if av is not None and bv is not None:
         return av == bv
+    if ',' in a and ',' in b:
+        ap, bp = _tuple_items(a), _tuple_items(b)
+        if len(ap) == len(bp):
+            return all(_semantic_math_equal(x, y) for x, y in zip(ap, bp))
     return _canonical_expr(a) == _canonical_expr(b)
 
 def _extract_boxed(text):
@@ -166,14 +183,20 @@ _WORD_NUMBERS = {
 }
 _WORD_NUMBER_RE = re.compile(r'\b(' + '|'.join(_WORD_NUMBERS) + r')\b', re.IGNORECASE)
 
+def _stated_values(text):
+    # A number in an exponent or subscript is part of an expression, not a stated
+    # answer: the 2 in '\sqrt{x^2 + 3}' must not match a ground truth of 2.
+    return [m.group().replace(' ', '') for m in re.finditer(_VALUE_TOKEN, text)
+            if not re.search(r'[\^_]\{?$', text[max(0, m.start() - 2):m.start()])]
+
 def _value_tokens(text):
-    tokens = [m.replace(' ', '') for m in re.findall(_VALUE_TOKEN, text)]
+    tokens = _stated_values(text)
     tokens += [str(_WORD_NUMBERS[w.lower()]) for w in _WORD_NUMBER_RE.findall(text)]
     return tokens
 
 def _last_value_token(text):
-    matches = re.findall(_VALUE_TOKEN, text)
-    return matches[-1].replace(' ', '') if matches else None
+    matches = _stated_values(text)
+    return matches[-1] if matches else None
 
 def _final_answer_region(text):
     """Text following the last final-answer marker, or None if no marker is present."""
@@ -284,7 +307,12 @@ def load_and_grade(args):
     valid_domains = ["math", "code", "science"]
     domains = valid_domains if "all" in args.domains else [d for d in args.domains if d in valid_domains]
     stored_science = load_science_extraction(args.ver_dir, suffix)
-    
+    # Code labels come from the committed probe cache, not a re-run: candidates near the
+    # 5 s timeout pass on one machine and time out on another.
+    cache = os.path.join("reports", "probes", "Do-stronger-models-make-mistakes-that-are-harder-to-catch",
+                         f"graded_code{'_pilot' if mode == 'pilot' else ''}.json")
+    code_grades = json.load(open(cache, encoding="utf-8")) if os.path.exists(cache) else {}
+
     for domain in domains:
         raw_path = os.path.join(args.raw_dir, f"{domain}{suffix}")
         gen_path = os.path.join(args.gen_dir, f"{domain}{suffix}")
@@ -350,7 +378,9 @@ def load_and_grade(args):
                     elif domain == "math":
                         is_correct = grade_math(cand_text, raw_item['ground_truth'])
                     elif domain == "code":
-                        is_correct = grade_code(cand_text, raw_item['test'], entry_point=raw_item.get('entry_point'))
+                        is_correct = code_grades.get(f"{item_id}|{gen_model}")
+                        if is_correct is None:
+                            is_correct = grade_code(cand_text, raw_item['test'], entry_point=raw_item.get('entry_point'))
                     graded_candidates[(domain, item_id, gen_model)] = is_correct
     return graded_candidates, pd.DataFrame(science_audit_rows)
 
@@ -1011,10 +1041,19 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
         if not code_agg.empty:
             override_sum = code_agg['Overrode_Passing_Tests'].sum()
             f.write(f"- **Total Overrides**: {override_sum} out of {code_agg['TP'].sum() + code_agg['FN'].sum()} passing submissions.\n\n")
-            f.write("#### By Verifier Model\n")
+            f.write("#### By Verifier Model and Strategy\n")
+            f.write("*Overrides, and their share of the passing submissions in that cell.*\n\n")
+            strategies = sorted(code_agg['strategy'].unique())
+            f.write("| Verifier | " + " | ".join(strategies) + " | All |\n")
+            f.write("|---|" + "---:|" * (len(strategies) + 1) + "\n")
             for verifier in sorted(code_agg['verifier'].unique()):
                 v_df = code_agg[code_agg['verifier'] == verifier]
-                f.write(f"- **{verifier}**: {v_df['Overrode_Passing_Tests'].sum()}\n")
+                cells = []
+                for s in strategies + [None]:
+                    c = v_df if s is None else v_df[v_df['strategy'] == s]
+                    passing, overrides = c['TP'].sum() + c['FN'].sum(), c['Overrode_Passing_Tests'].sum()
+                    cells.append(f"{overrides} ({100 * overrides / max(passing, 1):.1f}%)")
+                f.write(f"| {verifier} | " + " | ".join(cells) + " |\n")
         else:
             f.write("*(No code domain data present)*\n")
 

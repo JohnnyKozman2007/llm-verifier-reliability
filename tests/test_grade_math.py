@@ -183,5 +183,59 @@ class SemanticEquivalence(unittest.TestCase):
         self.assertFalse(grade_math(text, r"\boxed{\frac{13}{51}}"))
 
 
+class ResidualNormalization(unittest.TestCase):
+    """Camera-ready regrade: after the semantic-equivalence fix an independent sympy
+    matcher still found 30 correct candidates graded incorrect, all formatting (degree
+    marks, \\text{} wrappers, brace-less \\frac92 and \\sqrt3, tuple parentheses, a pi
+    fraction), and one wrong candidate graded correct through an exponent. The negative
+    cases are pairs a looser normalisation would equate."""
+
+    def test_degree_mark(self):
+        self.assertTrue(grade_math(r"<answer>66</answer>", r"\boxed{66^\circ}"))
+
+    def test_text_wrapped_choice_letter(self):
+        self.assertTrue(grade_math(r"<answer>E</answer>", r"\boxed{\text{(E)}}"))
+
+    def test_braceless_frac(self):
+        self.assertTrue(grade_math(r"<answer>9/2</answer>", r"\boxed{\frac92}"))
+
+    def test_braceless_sqrt(self):
+        self.assertTrue(grade_math(r"<answer>\sqrt{3} - \sqrt{2}</answer>", r"\boxed{\sqrt3-\sqrt2}"))
+
+    def test_tuple_without_parentheses(self):
+        self.assertTrue(grade_math(r"<answer>-1,1,1</answer>", r"\boxed{(-1,1,1)}"))
+
+    def test_pi_fraction(self):
+        self.assertTrue(grade_math(r"<answer>-pi/6</answer>", r"\boxed{-\frac{\pi}{6}}"))
+
+    def test_braceless_sqrt_takes_one_digit(self):
+        self.assertFalse(grade_math(r"<answer>\sqrt32</answer>", r"\boxed{\sqrt{32}}"))
+
+    def test_pi_after_fraction_is_not_pi_in_denominator(self):
+        self.assertFalse(grade_math(r"<answer>\frac{3}{4}\pi</answer>", r"\boxed{\frac{3}{4\pi}}"))
+
+    def test_variable_after_fraction_is_not_variable_in_denominator(self):
+        self.assertFalse(grade_math(r"<answer>\frac{1}{2}x</answer>", r"\boxed{\frac{1}{2x}}"))
+
+    def test_sqrt_argument_keeps_its_parentheses(self):
+        self.assertFalse(grade_math(r"<answer>\sqrt{2}3</answer>", r"\boxed{\sqrt{23}}"))
+
+    def test_tuple_is_not_a_number(self):
+        self.assertFalse(grade_math(r"<answer>(1,2)</answer>", r"\boxed{12}"))
+
+    def test_tuples_with_different_elements(self):
+        self.assertFalse(grade_math(r"<answer>-1,1,1</answer>", r"\boxed{-11,1}"))
+
+    def test_tuple_order_matters(self):
+        self.assertFalse(grade_math(r"<answer>(2,-3)</answer>", r"\boxed{(-3,2)}"))
+
+    def test_exponent_is_not_a_stated_answer(self):
+        # math_76 / mistral: the 2 in x^2 matched a ground truth of 2.
+        self.assertFalse(grade_math(r"<answer>$\sqrt{x^2 + 3}$</answer>", r"\boxed{2}"))
+
+    def test_answer_after_an_exponent_still_counts(self):
+        self.assertTrue(grade_math("Final answer: x^2 = 4, so x = 2", r"\boxed{2}"))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

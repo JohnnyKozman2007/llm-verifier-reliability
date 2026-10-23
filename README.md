@@ -4,8 +4,8 @@ Code, prompts, and verification traces for **"Neither Blinding Nor a Jury, Neith
 Capability Nor Strategy: What Brings a Verifier to Reliability"**
 (Verify-Agents Workshop, NeurIPS 2026).
 
-64,800 verification calls: 4 models x 3 authorship frames x 3 strategies x 3 domains
-(HumanEval+, MATH, GPQA-Diamond), 150 items per domain.
+64,800 verification calls: 4 generators x 4 verifiers x 3 authorship frames x 3 strategies,
+over 3 domains (HumanEval+, MATH, GPQA-Diamond) of 150 items each.
 
 ## Layout
 - `src/` pipeline (generate, verify, execution grounding, differential fuzzing) and `src/probes/`
@@ -36,7 +36,7 @@ python -m venv venv && source venv/bin/activate   # Windows: venv\Scripts\activa
 pip install -r requirements.txt
 cp .env.example .env                              # add DEEPINFRA_API_KEY (and HF_TOKEN for GPQA)
 python preflight_check.py
-python src/stratified_estimator.py                # headline +13.1 pp self-preference gap
+python src/stratified_estimator.py                # self-preference: +11.1 pp with error and judge fixed
 python run.py --mode actual --domain all          # full pipeline (needs API access)
 python src/report.py --mode actual --domains all
 python src/probes/analysis_ensemble.py            # other probes live in src/probes/
@@ -45,10 +45,19 @@ Pilot-run files are not included; `--mode pilot` regenerates them.
 
 ### Two reproduction paths
 
-**From the release, no credentials.** Everything in `reports/` regenerates from the
+**From the release, no credentials.** The paper's tables and figures regenerate from the
 committed traces:
 ```bash
-python src/report.py --mode actual --domains all
+python src/report.py --mode actual --domains all              # main-grid tables and plots
+python src/stratified_estimator.py                            # self-preference gap
+python src/probes/analysis_detectability.py                   # detectability (prints)
+python src/probes/analysis_oversight.py                       # oversight (prints)
+python src/probes/analysis_ensemble.py                        # ensembles, agreement, joint failure
+python src/probes/plot_detectability.py
+python src/probes/plot_ensemble.py
+python src/probes/plot_oversight.py
+python src/probes/generate_self_preference_report.py
+python src/probes/generate_style_transfer_report.py
 ```
 Science grading reads the option letter recorded at verification time instead of re-parsing
 candidate text, so the released records reproduce the published numbers. If the letters are
@@ -66,14 +75,27 @@ python run.py --mode actual --domain science
 
 ```bash
 python src/redact_release.py          # redact data/ and reports/ in place (idempotent)
-python src/redact_release.py --check  # exit 1 if any GPQA item text is present
+python src/redact_release.py --check  # exit 1 if any GPQA item text or local path is present
 ```
 Run the redactor before every commit that touches `data/` or `reports/`. The same check runs
 as `tests/test_release_redaction.py`.
 
-Note: code-candidate correctness is re-graded by executing candidates against the tests with a
-5-second timeout, so a few slow HumanEval items can flip on a slower machine and shift headline
-numbers by ~0.1 pp. The CSVs committed under `reports/` are the reference results.
+Note: code-candidate correctness is read from the committed labels in
+`reports/probes/Do-stronger-models-make-mistakes-that-are-harder-to-catch/graded_code.json`
+rather than re-run. Re-executing candidates under the 5-second timeout is not reproducible
+across machines: a few slow HumanEval candidates pass on one machine and time out on another.
+Delete that file only if you mean to re-grade code from scratch.
 
 ## Citation
-Citation to be added.
+```bibtex
+@inproceedings{kozman2026neither,
+  title     = {Neither Blinding Nor a Jury, Neither Capability Nor Strategy:
+               What Brings a Verifier to Reliability},
+  author    = {Kozman, Johnny and Parajuli, Tilak and Waddepalli, Arushi},
+  booktitle = {Workshop on Who Verifies the Agents? Toward Reliable Agent Development,
+               NeurIPS 2026},
+  year      = {2026},
+  url       = {https://github.com/JohnnyKozman2007/llm-verifier-reliability}
+}
+```
+The same metadata is in `CITATION.cff`.
