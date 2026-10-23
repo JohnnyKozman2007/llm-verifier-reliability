@@ -33,22 +33,10 @@ def judge_fixed_gap(errors):
         cov_type='cluster', cov_kwds={'groups': pd.factorize(d['item'])[0]})
     return fit.params['self_judge'], fit.bse['self_judge']
 
-def run_stratified_estimator(
-    csv_path="reports/actual/all/actual_all_results_granular.csv",
-    output_dir="reports/actual/all"
-):
-    if not os.path.exists(csv_path):
-        print(f"Error: dataset {csv_path} not found.")
-        sys.exit(1)
-        
-    print(f"Loading granular verification traces from {csv_path}...")
-    df = pd.read_csv(csv_path, low_memory=False)
-    
-    # Filter to error candidates and exclude strict JSON parsing failures
-    errors = df[(df['candidate_is_correct'] == False) & (df['strict_json_parse_fail'] == 0)].copy()
-    errors['is_self'] = (errors['verifier'] == errors['generator'])
-    errors['verdict_num'] = errors['parsed_verdict'].astype(float)
-    
+def error_fixed_gap(errors):
+    """Author vs other judges on the identical wrong answer, within strata of
+    (item, generator, strategy, frame). Returns strata, distinct errors, the author's and
+    the others' approval rates (%), the mean gap (pp) and its item-clustered SE."""
     # Group by stratum: (domain, item_id, generator, strategy, frame)
     grouped = errors.groupby(
         ['domain', 'item_id', 'generator', 'strategy', 'frame', 'is_self']
@@ -78,6 +66,27 @@ def run_stratified_estimator(
     residuals = diff_final - gap
     cluster_sums = residuals.groupby(item_cluster).sum()
     se = np.sqrt((cluster_sums ** 2).sum()) / n_strata
+    return n_strata, distinct_errors, self_fpr, other_fpr, gap, se
+
+def run_stratified_estimator(
+    csv_path="reports/actual/all/actual_all_results_granular.csv",
+    output_dir="reports/actual/all"
+):
+    if not os.path.exists(csv_path):
+        print(f"Error: dataset {csv_path} not found.")
+        sys.exit(1)
+
+    print(f"Loading granular verification traces from {csv_path}...")
+    df = pd.read_csv(csv_path, low_memory=False)
+
+    # Filter to error candidates and exclude strict JSON parsing failures
+    errors = df[(df['candidate_is_correct'] == False) & (df['strict_json_parse_fail'] == 0)].copy()
+    errors['is_self'] = (errors['verifier'] == errors['generator'])
+    errors['verdict_num'] = errors['parsed_verdict'].astype(float)
+    # Mistral dropped as both generator and judge
+    no_mistral = errors[(errors['generator'] != 'mistral') & (errors['verifier'] != 'mistral')]
+
+    n_strata, distinct_errors, self_fpr, other_fpr, gap, se = error_fixed_gap(errors)
     ci_lower = gap - 1.96 * se
     ci_upper = gap + 1.96 * se
     
@@ -93,8 +102,11 @@ def run_stratified_estimator(
     print(f"95% Confidence Interval: [{ci_lower:+.1f}, {ci_upper:+.1f}]")
     print("=" * 70)
 
+    n_strata_nm, _, _, _, gap_nm, se_nm = error_fixed_gap(no_mistral)
+    print(f"\nError held fixed, without Mistral: {gap_nm:+.1f} pp  "
+          f"95% CI [{gap_nm - 1.96 * se_nm:+.1f}, {gap_nm + 1.96 * se_nm:+.1f}]  ({n_strata_nm:,} strata)")
+
     fe_gap, fe_se = judge_fixed_gap(errors)
-    no_mistral = errors[(errors['generator'] != 'mistral') & (errors['verifier'] != 'mistral')]
     fe_gap_nm, fe_se_nm = judge_fixed_gap(no_mistral)
     print("\nError AND judge held fixed (two-way fixed effects, item-clustered SE):")
     print(f"  all judges      : {fe_gap:+.1f} pp  95% CI [{fe_gap - 1.96 * fe_se:+.1f}, {fe_gap + 1.96 * fe_se:+.1f}]")
@@ -133,7 +145,8 @@ def run_stratified_estimator(
         f.write(f"- **Other False Positive Rate (FPR)**: {other_fpr:.1f}%\n")
         f.write(f"- **Self-Preference Gap**: {gap:+.1f} pp\n")
         f.write(f"- **Item-Clustered SE**: {se:.2f} pp\n")
-        f.write(f"- **95% Confidence Interval**: [{ci_lower:+.1f}, {ci_upper:+.1f}]\n\n")
+        f.write(f"- **95% Confidence Interval**: [{ci_lower:+.1f}, {ci_upper:+.1f}]\n")
+        f.write(f"- **Without Mistral**: {gap_nm:+.1f} pp, 95% CI [{gap_nm - 1.96 * se_nm:+.1f}, {gap_nm + 1.96 * se_nm:+.1f}] ({n_strata_nm:,} strata)\n\n")
         f.write("## Error and Judge Held Fixed\n\n")
         f.write("Two-way fixed effects (error, judge, strategy, frame), item-clustered SE.\n\n")
         f.write(f"- **All judges**: {fe_gap:+.1f} pp, 95% CI [{fe_gap - 1.96 * fe_se:+.1f}, {fe_gap + 1.96 * fe_se:+.1f}]\n")
@@ -147,6 +160,7 @@ def run_stratified_estimator(
     print(f"\nSaved executive summary to: {report_md}")
     return {'strata': n_strata, 'distinct_errors': distinct_errors, 'self_fpr': self_fpr,
             'other_fpr': other_fpr, 'gap': gap, 'se': se, 'per_verifier': model_data,
+            'gap_no_mistral': gap_nm, 'se_no_mistral': se_nm,
             'judge_fixed_gap': fe_gap, 'judge_fixed_se': fe_se,
             'judge_fixed_gap_no_mistral': fe_gap_nm, 'judge_fixed_se_no_mistral': fe_se_nm}
 

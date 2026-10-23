@@ -7,6 +7,7 @@
 - **Self-Preference Gap**: +13.9 pp
 - **Item-Clustered SE**: 1.19 pp
 - **95% Confidence Interval**: [+11.5, +16.2]
+- **Without Mistral**: +6.1 pp, 95% CI [+3.5, +8.6] (3,875 strata)
 
 ## Error and Judge Held Fixed
 

@@ -88,6 +88,9 @@ class StratifiedEstimator(unittest.TestCase):
         # Holding only the error fixed, mistral's leniency on its own errors reads as self-preference.
         self.assertAlmostEqual(out["gap"], 40.0)
         self.assertAlmostEqual(out["judge_fixed_gap"], 0.0, places=6)
+        # Without mistral, qwen and llama treat every error alike: no gap either way.
+        self.assertAlmostEqual(out["gap_no_mistral"], 0.0)
+        self.assertAlmostEqual(out["judge_fixed_gap_no_mistral"], 0.0, places=6)
 
 
 if __name__ == "__main__":

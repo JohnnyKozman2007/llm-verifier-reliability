@@ -364,7 +364,8 @@ so every judge is scored on the identical wrong answer. Across 6{,}014 such stra
 holds the error fixed but not the judge, so a lenient judge's own errors look self-preferred
 whenever the other judges are stricter. Adding judge fixed effects to the error ones (a
 linear probability model, item-clustered errors) gives \textbf{+11.1 points} (95\% CI
-$[+8.9,+13.2]$); without Mistral, the most lenient judge, it is $+5.6$ ($[+3.1,+8.1]$).
+$[+8.9,+13.2]$); without Mistral, the most lenient judge, it is $+5.6$ ($[+3.1,+8.1]$;
+Table~\ref{tab:self-pref-estimates} gives both estimates with and without Mistral).
 The effect is not uniform: it is largest for Mistral's errors ($+35.8$ pp) and reverses for
 DeepSeek's ($-11.7$ pp), whose errors the other judges approve more readily than DeepSeek
 itself does, and by judge, DeepSeek and Qwen approve their own errors about 22 points more
@@ -762,6 +763,32 @@ DeepSeek & 78.4 & 79.5 & 79.0 & 79.9 \\
 Llama    & 79.8 & 77.1 & 77.6 & 76.2 \\
 Mistral  & 60.7 & 70.7 & 60.9 & 69.4 \\
 Qwen     & 74.2 & 79.1 & 74.6 & 79.2 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Self-Preference Estimates}
+\label{app:framing:estimates}
+
+\begin{table}[H]
+\centering
+\small
+\caption{Self-preference on wrong answers: how much more often the author approves its own
+error than other judges do (pp). The error-fixed estimate compares judges within strata of
+(item, generator, told frame, strategy), so every judge sees the identical wrong answer, but a
+lenient judge's own errors look self-preferred whenever the other judges are stricter. The
+error-and-judge-fixed estimate adds judge fixed effects (a linear probability model with error,
+judge, strategy and frame effects). ``Without Mistral'' drops it as both generator and judge.
+Intervals are 95\%, with item-clustered standard errors.}
+\label{tab:self-pref-estimates}
+\begin{tabular}{lcc}
+\toprule
+Estimate & All four models & Without Mistral \\
+\midrule
+Error fixed            & $+13.9$ $[+11.5, +16.2]$ & $+6.1$ $[+3.5, +8.6]$ \\
+Error and judge fixed  & $+11.1$ $[+8.9, +13.2]$  & $+5.6$ $[+3.1, +8.1]$ \\
+\midrule
+Strata (error-fixed)   & 6{,}014 & 3{,}875 \\
 \bottomrule
 \end{tabular}
 \end{table}
