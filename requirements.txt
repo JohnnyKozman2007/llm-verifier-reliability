@@ -1,0 +1,18 @@
+# Pinned for reproducibility. Every entry below is actually imported by the pipeline.
+# Verified against src/ and preflight_check.py on 2026-08-20.
+
+# API client for all four models (DeepInfra OpenAI-compatible endpoint)
+openai==3.3.1
+python-dotenv==1.2.3
+
+# Dataset loading: competition_math, humanevalplus, gpqa
+datasets==5.0.1
+
+# Analysis and plotting (report.py)
+numpy==2.3.4
+pandas==3.0.5
+scipy==1.18.0
+matplotlib==3.11.1
+seaborn==0.13.2
+scikit-learn==1.7.2  # cohen_kappa_score, used by src/probes/analysis_ensemble.py
+statsmodels==0.14.6  # ConditionalLogit, used by src/probes/analysis_detectability.py

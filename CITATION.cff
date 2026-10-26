@@ -1,0 +1,30 @@
+cff-version: 1.2.0
+message: "If you use this code or these traces, please cite the paper below."
+title: "LLM Verifier Reliability: code, prompts and verification traces"
+repository-code: "https://github.com/JohnnyKozman2007/llm-verifier-reliability"
+license:
+  - MIT
+  - CC-BY-4.0
+authors:
+  - family-names: Kozman
+    given-names: Johnny
+    affiliation: University of Hertfordshire
+  - family-names: Parajuli
+    given-names: Tilak
+    affiliation: Tribhuvan University
+  - family-names: Waddepalli
+    given-names: Arushi
+    affiliation: "Indian Institute of Information Technology, Lucknow"
+preferred-citation:
+  type: generic
+  title: "Neither Blinding Nor a Jury, Neither Capability Nor Strategy: What Brings a Verifier to Reliability"
+  authors:
+    - family-names: Kozman
+      given-names: Johnny
+    - family-names: Parajuli
+      given-names: Tilak
+    - family-names: Waddepalli
+      given-names: Arushi
+  notes: "Workshop on Who Verifies the Agents? Toward Reliable Agent Development, NeurIPS 2026"
+  year: 2026
+  url: "https://github.com/JohnnyKozman2007/llm-verifier-reliability"

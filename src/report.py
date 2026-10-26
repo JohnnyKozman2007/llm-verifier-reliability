@@ -1,0 +1,1132 @@
+import os
+import json
+import re
+import fractions
+from decimal import Decimal, InvalidOperation
+import argparse
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from scipy.stats import chi2_contingency
+from execution_grounding import run_candidate_code
+from science_utils import (
+    grade_science_candidate,
+    is_withheld,
+    parse_science_for_item,
+)
+from verdict_utils import normalize_bool_verdict, recover_verdict_from_raw_response
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--raw_dir", default="data/raw", help="Directory with raw jsonl files")
+    parser.add_argument("--gen_dir", default="data/generated", help="Directory with generated jsonl files")
+    parser.add_argument("--ver_dir", default="data/verified", help="Directory with verified jsonl files")
+    parser.add_argument("--out_dir", default="reports", help="Output directory for CSV reports")
+    parser.add_argument("--plot_dir", default="plots", help="Output directory for plots")
+    parser.add_argument("--mode", type=str, choices=["pilot", "actual"], default="pilot", help="Run in pilot or actual mode")
+    parser.add_argument("--domains", nargs='+', default=["all"], help="Domains to report: code, science, math, or all")
+    parser.add_argument("--overwrite", action="store_true", help="Overwrite existing reports without prompting")
+    return parser.parse_args()
+
+def _notes_to_string(notes):
+    if notes is None:
+        return ""
+    if isinstance(notes, list):
+        return ";".join(str(note) for note in notes)
+    return str(notes)
+
+# normalize_bool_verdict / recover_verdict_from_raw_response live in verdict_utils.py so the
+# release redactor can replay the recovery step without importing the plotting stack.
+
+# Science parsing and grading live in science_utils.py. They used to be duplicated here and
+# in science_utils, with the two copies disagreeing about whether an ambiguous parse counts
+# as correct - keeping one implementation means that cannot drift again.
+
+def _normalize_math_string(s):
+    """Strip formatting that does not change meaning: LaTeX spacing/sizing commands,
+    \\dfrac/\\tfrac -> \\frac, degree marks, \\text{} wrappers, brace-less \\frac92 and
+    \\sqrt3 (one digit per argument, as LaTeX reads them), parentheses around the whole
+    answer unless it is a tuple, and all whitespace."""
+    s = str(s).strip()
+    s = re.sub(r'\\(?:left|right|,|;|:|!|quad|qquad|bigl|bigr|Bigl|Bigr)', '', s)
+    s = s.replace('\\dfrac', '\\frac').replace('\\tfrac', '\\frac')
+    s = re.sub(r'\^(?:\{\\circ\}|\\circ)', '', s)
+    s = re.sub(r'\\(?:text|mbox|mathrm)\{([^{}]*)\}', r'\1', s)
+    s = re.sub(r'\\frac(\d)(\d)', r'\\frac{\1}{\2}', s)
+    s = re.sub(r'\\sqrt(\d)', r'\\sqrt{\1}', s)
+    s = re.sub(r'\s+', '', s)
+    if re.fullmatch(r'\([^(),]*\)', s):
+        s = s[1:-1]
+    return s
+
+def _exact_number(s):
+    """Exact rational value of a plain numeric answer: integers, decimals, 'a/b',
+    and LaTeX '\\frac{a}{b}' (including signs). None if not a plain number.
+
+    Exactness matters: float() cannot parse fractions at all, which is what made
+    '13/51' vs '\\frac{13}{51}' grade as incorrect (audit: 76/264 false negatives).
+    """
+    # Only thousands separators: '1,000' is a number, '1,2' and '-1,1,1' are tuples.
+    s = re.sub(r'(?<=\d),(?=\d{3}(?!\d))', '', str(s).strip())
+    neg = s.startswith('-')
+    if neg:
+        s = s[1:]
+    m = re.fullmatch(r'\\frac\{(-?\d+)\}\{(-?\d+)\}', s)
+    if m:
+        try:
+            return fractions.Fraction(int(m.group(1)), int(m.group(2))) * (-1 if neg else 1)
+        except ZeroDivisionError:
+            return None
+    m = re.fullmatch(r'(\d+)\s*/\s*(\d+)', s)
+    if m:
+        try:
+            return fractions.Fraction(int(m.group(1)), int(m.group(2))) * (-1 if neg else 1)
+        except ZeroDivisionError:
+            return None
+    m = re.fullmatch(r'(\d+(?:\.\d+)?)', s)
+    if m:
+        try:
+            return fractions.Fraction(Decimal(m.group(1))) * (-1 if neg else 1)
+        except InvalidOperation:
+            return None
+    return None
+
+def _canonical_expr(s):
+    """Canonical formatting-only form of a symbolic answer, so that equivalent
+    notations compare equal: 'sqrt(2)' == '\\sqrt{2}', '50pi' == '50 \\pi',
+    '2\\cdot 3' == '2*3', 'x^{2}' == 'x^2', '\\frac{a}{b}' == '(a)/(b)'."""
+    s = _normalize_math_string(s)
+    s = re.sub(r'\\frac\{(-?[^{}]+)\}\{(-?[^{}]+)\}', r'(\1)/(\2)', s)
+    s = re.sub(r'\\sqrt\{([^{}]+)\}', r'sqrt(\1)', s)
+    s = s.replace('\\times', '*').replace('\\cdot', '*').replace('\\pi', 'pi').replace('\\infty', 'inf')
+    s = re.sub(r'\^\{(-?[^{}]+)\}', r'^\1', s)
+    # Parentheses around a lone number or symbol are redundant ('-(pi)/(6)' == '-pi/6')
+    # unless they mark a function argument or an implicit product: 'sqrt(2)3' and
+    # '(3)/(4)pi' keep theirs, or they would collide with 'sqrt(23)' and '(3)/(4pi)'.
+    s = re.sub(r'(?<![\w)])\((\d+(?:\.\d+)?|[A-Za-z]|pi|inf)\)(?![\w(])', r'\1', s)
+    return s
+
+def _tuple_items(s):
+    """Elements of a comma-separated answer, with one optional pair of enclosing
+    parentheses: '(-1,1,1)' and '-1,1,1' both give ['-1', '1', '1']."""
+    if s.startswith('(') and s.endswith(')') and '(' not in s[1:-1]:
+        s = s[1:-1]
+    return s.split(',')
+
+def _semantic_math_equal(a, b):
+    """API-free semantic equality between two math answer strings.
+
+    Order: normalized exact string, then exact rational equality (fractions and
+    decimals, reduced or not), then element-wise tuple equality, then canonical
+    expression equality. Conservative:
+    it only absorbs formatting differences and never evaluates algebra, so it
+    cannot equate two genuinely different answers.
+    """
+    a = _normalize_math_string(a)
+    b = _normalize_math_string(b)
+    if a == b:
+        return True
+    av, bv = _exact_number(a), _exact_number(b)
+    if av is not None and bv is not None:
+        return av == bv
+    if ',' in a and ',' in b:
+        ap, bp = _tuple_items(a), _tuple_items(b)
+        if len(ap) == len(bp):
+            return all(_semantic_math_equal(x, y) for x, y in zip(ap, bp))
+    return _canonical_expr(a) == _canonical_expr(b)
+
+def _extract_boxed(text):
+    """
+    Contents of every \\boxed{...}, brace-matched.
+
+    A non-greedy regex stops at the first '}', which truncates nested LaTeX:
+    \\boxed{25 + 2\\sqrt{159}} became "25 + 2\\sqrt{159". That corrupted the ground
+    truth itself for any answer containing braces.
+    """
+    out, i, tag = [], 0, r'\boxed{'
+    while True:
+        i = text.find(tag, i)
+        if i == -1:
+            return out
+        j = start = i + len(tag)
+        depth = 1
+        while j < len(text) and depth:
+            if text[j] == '{':
+                depth += 1
+            elif text[j] == '}':
+                depth -= 1
+            j += 1
+        if depth == 0:
+            out.append(text[start:j - 1])
+        i = j
+
+# A value token: integer, decimal, or simple fraction. Used to pull an answer out of
+# a phrase like ", x = 3." or ": 42".
+_VALUE_TOKEN = r'-?\d+(?:\.\d+)?(?:\s*/\s*-?\d+)?'
+
+# Phrases a solution uses to announce its final answer. The LAST occurrence wins.
+_ANSWER_MARKER = re.compile(
+    r'\b(?:final\s+answer\b|the\s+answer\s+is\b|answer\s*[:=]|therefore\b'
+    r'|thus\b|hence\b|there\s+(?:are|is)\b)',
+    re.IGNORECASE,
+)
+
+# Solutions sometimes state a count in words ("there are three solutions"). Only
+# consulted inside a final-answer region, never across the whole response.
+_WORD_NUMBERS = {
+    "zero": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+    "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
+    "thirteen": 13, "fourteen": 14, "fifteen": 15, "sixteen": 16, "seventeen": 17,
+    "eighteen": 18, "nineteen": 19, "twenty": 20, "thirty": 30, "forty": 40,
+    "fifty": 50, "sixty": 60, "seventy": 70, "eighty": 80, "ninety": 90,
+    "hundred": 100,
+}
+_WORD_NUMBER_RE = re.compile(r'\b(' + '|'.join(_WORD_NUMBERS) + r')\b', re.IGNORECASE)
+
+def _stated_values(text):
+    # A number in an exponent or subscript is part of an expression, not a stated
+    # answer: the 2 in '\sqrt{x^2 + 3}' must not match a ground truth of 2.
+    return [m.group().replace(' ', '') for m in re.finditer(_VALUE_TOKEN, text)
+            if not re.search(r'[\^_]\{?$', text[max(0, m.start() - 2):m.start()])]
+
+def _value_tokens(text):
+    tokens = _stated_values(text)
+    tokens += [str(_WORD_NUMBERS[w.lower()]) for w in _WORD_NUMBER_RE.findall(text)]
+    return tokens
+
+def _last_value_token(text):
+    matches = _stated_values(text)
+    return matches[-1] if matches else None
+
+def _final_answer_region(text):
+    """Text following the last final-answer marker, or None if no marker is present."""
+    last = None
+    for m in _ANSWER_MARKER.finditer(text):
+        last = m
+    return text[last.end():] if last else None
+
+def _answer_matches(region, gt_val):
+    """
+    Does this final-answer region state gt_val as its answer?
+
+    Every value token in the region counts, not just the first: a stated answer is
+    often prose ("Final Answer: it would take 50 workers 6 days"). This is issue #3's
+    own suggested fix, restricting the search space to the final-answer region rather
+    than abandoning number extraction.
+    """
+    if region is None:
+        return False
+    region = region.strip()
+    if not region:
+        return False
+    if _semantic_math_equal(region, gt_val):
+        return True
+    for token in _value_tokens(region):
+        if _semantic_math_equal(token, gt_val):
+            return True
+    try:
+        float(gt_val.replace(',', ''))
+        return False
+    except ValueError:
+        # Non-numeric ground truth (fractions, expressions): boundary match, but only
+        # inside this region, never across the whole response.
+        return re.search(rf'(?<!\w){re.escape(gt_val)}(?!\w)', region) is not None
+
+def grade_math(candidate_text, ground_truth):
+    """
+    Grade the candidate's FINAL answer only.
+
+    Issue #3: scanning every number in the response graded wrong answers as correct
+    whenever the ground truth happened to appear in the working. Resolution order,
+    most reliable first.
+    """
+    if not candidate_text:
+        return False
+
+    gt_boxed = _extract_boxed(ground_truth)
+    gt_val = gt_boxed[-1].strip() if gt_boxed else ground_truth.strip()
+
+    tagged = re.findall(r'<answer>(.*?)</answer>', candidate_text, re.DOTALL | re.IGNORECASE)
+    if tagged:
+        return _answer_matches(tagged[-1], gt_val)
+
+    boxed = _extract_boxed(candidate_text)
+    if boxed:
+        return _answer_matches(boxed[-1], gt_val)
+
+    region = _final_answer_region(candidate_text)
+    if region is not None:
+        return _answer_matches(region, gt_val)
+
+    return _answer_matches(_last_value_token(candidate_text), gt_val)
+
+def grade_code(candidate_text, test_code, entry_point=None):
+    """Reuses run_candidate_code from execution_grounding.py — single source of truth."""
+    if not candidate_text: return False
+    result = run_candidate_code(candidate_text, test_code, entry_point=entry_point)
+    return result.ran_successfully
+
+def load_science_extraction(ver_dir, suffix):
+    """Stored per-(item, generator) science extraction, used when candidate text is redacted.
+
+    The extracted letter is a property of the candidate, not of the verifier, so every
+    verified row sharing (item_id, generator_model) carries the same value; take the first
+    non-null one. This is the same parser output the released traces were graded with.
+    """
+    path = os.path.join(ver_dir, f"science{suffix}")
+    stored = {}
+    if not os.path.exists(path):
+        return stored
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            row = json.loads(line)
+            key = (row.get("item_id"), row.get("generator_model"))
+            entry = {
+                "letter": row.get("candidate_answer_letter"),
+                "option_text": None,
+                "mode": row.get("candidate_answer_extraction_mode"),
+                "confidence": row.get("candidate_answer_extraction_confidence"),
+                "ambiguous": bool(row.get("candidate_answer_ambiguous")),
+                "notes": row.get("candidate_answer_parse_notes") or [],
+            }
+            # A null letter is a legitimate outcome (nothing extractable), so a key with a
+            # null letter must still count as "stored". Only prefer a row where the letter
+            # was actually extracted, since that is the value the original grading used.
+            if key not in stored or (stored[key]["letter"] is None and entry["letter"] is not None):
+                stored[key] = entry
+    return stored
+
+
+def load_and_grade(args):
+    graded_candidates = {}
+    science_audit_rows = []
+    mode = args.mode
+    suffix = "_pilot.jsonl" if mode == "pilot" else ".jsonl"
+    valid_domains = ["math", "code", "science"]
+    domains = valid_domains if "all" in args.domains else [d for d in args.domains if d in valid_domains]
+    stored_science = load_science_extraction(args.ver_dir, suffix)
+    # Code labels come from the committed probe cache, not a re-run: candidates near the
+    # 5 s timeout pass on one machine and time out on another.
+    cache = os.path.join("reports", "probes", "Do-stronger-models-make-mistakes-that-are-harder-to-catch",
+                         f"graded_code{'_pilot' if mode == 'pilot' else ''}.json")
+    code_grades = json.load(open(cache, encoding="utf-8")) if os.path.exists(cache) else {}
+
+    for domain in domains:
+        raw_path = os.path.join(args.raw_dir, f"{domain}{suffix}")
+        gen_path = os.path.join(args.gen_dir, f"{domain}{suffix}")
+        
+        if not os.path.exists(raw_path) or not os.path.exists(gen_path):
+            continue
+            
+        raw_dict = {}
+        with open(raw_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                item = json.loads(line)
+                raw_dict[item['item_id']] = item
+                
+        with open(gen_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                item = json.loads(line)
+                item_id = item['item_id']
+                raw_item = raw_dict.get(item_id)
+                if not raw_item: continue
+                
+                for gen_model, cand_text in item.get('candidates', {}).items():
+                    if domain == "science":
+                        ground_truth_letter = str(raw_item.get("ground_truth", "")).upper()
+                        if is_withheld(cand_text):
+                            # Released traces carry no candidate text. Fall back to the letter that
+                            # was extracted at verification time; never silently grade a redacted
+                            # candidate as wrong, which would print 0% accuracy with no warning.
+                            stored = stored_science.get((item_id, gen_model))
+                            if stored is None:
+                                raise RuntimeError(
+                                    f"Science candidate {item_id}/{gen_model} is redacted and no stored "
+                                    "extraction exists in data/verified/science*.jsonl. Re-run the pipeline "
+                                    "with HF_TOKEN set, or restore the verified traces."
+                                )
+                            parsed_science = stored
+                            ground_truth_text = None
+                            extracted_option_text = None
+                            is_correct = (
+                                stored["letter"] == ground_truth_letter and not stored["ambiguous"]
+                            )
+                        else:
+                            # parse for the audit columns, but take the verdict from the canonical
+                            # grader so the audit CSV can never disagree with the graded labels.
+                            parsed_science = parse_science_for_item(cand_text, raw_item)
+                            ground_truth_text = raw_item.get("correct_answer_text")
+                            extracted_option_text = parsed_science.get("option_text")
+                            is_correct = grade_science_candidate(cand_text, raw_item)
+
+                        science_audit_rows.append({
+                            "item_id": item_id,
+                            "generator": gen_model,
+                            "ground_truth_letter": ground_truth_letter,
+                            "ground_truth_text": ground_truth_text,
+                            "extracted_letter": parsed_science.get("letter"),
+                            "extracted_option_text": extracted_option_text,
+                            "extraction_mode": parsed_science.get("mode"),
+                            "extraction_confidence": parsed_science.get("confidence"),
+                            "ambiguous": int(bool(parsed_science.get("ambiguous"))),
+                            "parsed_successfully": int(parsed_science.get("letter") is not None),
+                            "parse_notes": _notes_to_string(parsed_science.get("notes")),
+                            "is_correct": int(is_correct),
+                        })
+                    elif domain == "math":
+                        is_correct = grade_math(cand_text, raw_item['ground_truth'])
+                    elif domain == "code":
+                        is_correct = code_grades.get(f"{item_id}|{gen_model}")
+                        if is_correct is None:
+                            is_correct = grade_code(cand_text, raw_item['test'], entry_point=raw_item.get('entry_point'))
+                    graded_candidates[(domain, item_id, gen_model)] = is_correct
+    return graded_candidates, pd.DataFrame(science_audit_rows)
+
+def load_fuzz_results(args):
+    """Returns (fuzz_dict, fuzz_rows).
+
+    fuzz_dict  : {(item_id, gen, ver, frame, strategy) -> verdict_string}
+                 used downstream to adjust confusion-matrix cells.
+    fuzz_rows  : list of raw dicts from code_overrides*.jsonl
+                 used to build the oracle/fuzzing statistics section.
+    """
+    mode = args.mode
+    suffix = "_pilot.jsonl" if mode == "pilot" else ".jsonl"
+    fuzz_dict = {}
+    fuzz_rows = []
+    path = os.path.join("data", "validated", f"code_overrides{suffix}")
+    if os.path.exists(path):
+        with open(path, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                item = json.loads(line)
+                key = (item['item_id'], item['generator_model'], item['verifier_model'], item['frame'], item['strategy'])
+                fuzz_dict[key] = item.get('fuzz_verdict')
+                fuzz_rows.append(item)
+    return fuzz_dict, fuzz_rows
+
+def analyze_verifications(args, graded_candidates, fuzz_dict):
+    mode = args.mode
+    suffix = "_pilot.jsonl" if mode == "pilot" else ".jsonl"
+    valid_domains = ["math", "code", "science"]
+    domains = valid_domains if "all" in args.domains else [d for d in args.domains if d in valid_domains]
+    rows = []
+    fuzz_errors_removed = 0
+    
+    for domain in domains:
+        ver_path = os.path.join(args.ver_dir, f"{domain}{suffix}")
+        if not os.path.exists(ver_path): continue
+        
+        with open(ver_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                v = json.loads(line)
+                item_id = v['item_id']
+                gen_model = v['generator_model']
+                ver_model = v['verifier_model']
+                frame = v['frame']
+                strategy = v['strategy']
+                
+                cand_is_correct = graded_candidates.get((domain, item_id, gen_model), False)
+                adjusted_cand_is_correct = cand_is_correct
+                
+                fuzz_verdict = None
+                if domain == "code":
+                    key = (item_id, gen_model, ver_model, frame, strategy)
+                    fuzz_verdict = fuzz_dict.get(key)
+                
+                if fuzz_verdict in ("ERROR", "SKIPPED_PIPELINE_FAIL"):
+                    fuzz_errors_removed += 1
+                    # We no longer `continue` here! If the pipeline fails, we fall back to the basic test result.
+                    pass
+                    
+                if fuzz_verdict == "BUG_CONFIRMED":
+                    adjusted_cand_is_correct = False
+                elif fuzz_verdict in ("REFERENCE_BUG", "NO_DISCREPANCY"):
+                    adjusted_cand_is_correct = True
+
+                original_parsed_verdict = normalize_bool_verdict(v.get('parsed_verdict'))
+                parsed = original_parsed_verdict
+                verdict_recovered_from_raw = False
+
+                if parsed is None:
+                    raw_response = v.get("raw_response")
+                    if is_withheld(raw_response):
+                        # Raw response redacted at release: use the recovery decision recorded
+                        # by the redactor, which ran the same recovery function before masking.
+                        recovered = v.get("verdict_recovered")
+                        if recovered is not None:
+                            parsed = bool(recovered)
+                            verdict_recovered_from_raw = True
+                    else:
+                        recovered = recover_verdict_from_raw_response(raw_response)
+                        if recovered is not None:
+                            parsed = recovered
+                            verdict_recovered_from_raw = True
+                thinking = v.get('thinking_or_evaluation', '')
+                verbosity = v.get("verbosity_chars")
+                if verbosity is None:
+                    if is_withheld(thinking):
+                        raise RuntimeError(
+                            f"Row {v.get('item_id')}/{v.get('generator_model')}/"
+                            f"{v.get('verifier_model')}/{v.get('frame')}/{v.get('strategy')} has "
+                            "redacted thinking text but no verbosity_chars column. Re-run "
+                            "src/redact_release.py to backfill it."
+                        )
+                    verbosity = len(thinking) if thinking else 0
+                
+                if parsed is None:
+                    # Unparseable verdict: exclude from confusion matrix entirely
+                    tp = fp = tn = fn = False
+                    adj_tp = adj_fp = adj_tn = adj_fn = False
+                else:
+                    verdict = parsed
+                    tp = (cand_is_correct == True and verdict == True)
+                    fp = (cand_is_correct == False and verdict == True)
+                    tn = (cand_is_correct == False and verdict == False)
+                    fn = (cand_is_correct == True and verdict == False)
+                    
+                    adj_tp = (adjusted_cand_is_correct == True and verdict == True)
+                    adj_fp = (adjusted_cand_is_correct == False and verdict == True)
+                    adj_tn = (adjusted_cand_is_correct == False and verdict == False)
+                    adj_fn = (adjusted_cand_is_correct == True and verdict == False)
+                
+                # Ground-truth authorship, independent of what the verifier was TOLD (frame).
+                actual_source = 'self' if gen_model == ver_model else 'other'
+                # Was the told frame accurate? (only meaningful when frame in {self, other})
+                frame_matches_truth = (frame == actual_source) if frame in ('self', 'other') else None
+
+                candidate_answer_letter = v.get("candidate_answer_letter")
+                candidate_answer_ambiguous = int(domain == "science" and bool(v.get("candidate_answer_ambiguous")))
+                candidate_answer_parsed = int(domain == "science" and candidate_answer_letter is not None)
+                
+                rows.append({
+                    'domain': domain,
+                    'item_id': item_id,
+                    'generator': gen_model,
+                    'verifier': ver_model,
+                    'frame': frame,
+                    'actual_source': actual_source,
+                    'frame_matches_truth': frame_matches_truth,
+                    'strategy': strategy,
+                    'candidate_is_correct': cand_is_correct,
+                    'adjusted_candidate_is_correct': adjusted_cand_is_correct,
+                    'parsed_verdict': parsed,
+                    'original_parsed_verdict': original_parsed_verdict,
+                    'verdict_recovered_from_raw': int(verdict_recovered_from_raw),
+                    'strict_json_parse_fail': int(original_parsed_verdict is None),
+                    "candidate_answer_letter": candidate_answer_letter,
+                    "candidate_answer_text": v.get("candidate_answer_text"),
+                    "candidate_answer_extraction_mode": v.get("candidate_answer_extraction_mode"),
+                    "candidate_answer_extraction_confidence": v.get("candidate_answer_extraction_confidence"),
+                    "candidate_answer_ambiguous": candidate_answer_ambiguous,
+                    "candidate_answer_parsed": candidate_answer_parsed,
+                    "candidate_answer_parse_notes": _notes_to_string(v.get("candidate_answer_parse_notes")),
+                    "prompt_tokens": v.get("prompt_tokens", 0),
+                    "completion_tokens": v.get("completion_tokens", 0),
+                    'formatting_fail': int(parsed is None),
+                    'tp': int(tp),
+                    'fp': int(fp),
+                    'tn': int(tn),
+                    'fn': int(fn),
+                    'adj_tp': int(adj_tp),
+                    'adj_fp': int(adj_fp),
+                    'adj_tn': int(adj_tn),
+                    'adj_fn': int(adj_fn),
+                    'latency': v.get('latency', 0),
+                    'verbosity': verbosity,
+                    'overrode_passing_tests': int(v.get('overrode_passing_tests', False))
+                })
+    return pd.DataFrame(rows), fuzz_errors_removed
+
+def write_breakdown_section(f, title, df, value_col, is_percent=True, invert_good=False):
+    f.write(f"\n## {title}\n")
+    overall = df[value_col].mean()
+    f.write("### Overall Average Across Everything\n")
+    if is_percent:
+        f.write(f"- **Overall**: {overall*100:.1f}%\n")
+    else:
+        f.write(f"- **Overall**: {overall:.1f}\n")
+    
+    f.write(f"### By Domain\n")
+    for domain in sorted(df['domain'].unique()):
+        val = df[df['domain'] == domain][value_col].mean()
+        f.write(f"- **{domain.capitalize()}**: {val*100:.1f}%\n" if is_percent else f"- **{domain.capitalize()}**: {val:.1f}\n")
+        
+    f.write(f"### By Strategy\n")
+    for strat in sorted(df['strategy'].unique()):
+        val = df[df['strategy'] == strat][value_col].mean()
+        f.write(f"- **{strat}**: {val*100:.1f}%\n" if is_percent else f"- **{strat}**: {val:.1f}\n")
+        
+    f.write(f"### By Ownership Frame\n")
+    for frame in sorted(df['frame'].unique()):
+        val = df[df['frame'] == frame][value_col].mean()
+        f.write(f"- **{frame}**: {val*100:.1f}%\n" if is_percent else f"- **{frame}**: {val:.1f}\n")
+        
+    f.write(f"### By Model\n")
+    for model in sorted(df['verifier'].unique()):
+        val = df[df['verifier'] == model][value_col].mean()
+        f.write(f"- **{model}**: {val*100:.1f}%\n" if is_percent else f"- **{model}**: {val:.1f}\n")
+        
+    f.write(f"### Top 3 Best Ownership + Strategy Combos\n")
+    combo_grp = df.groupby(['frame', 'strategy'])[value_col].mean().reset_index()
+    if invert_good:
+        top_combos = combo_grp.sort_values(by=value_col, ascending=True).head(3)
+    else:
+        top_combos = combo_grp.sort_values(by=value_col, ascending=False).head(3)
+    for _, row in top_combos.iterrows():
+        f.write(f"- **{row['frame']} + {row['strategy']}**: {row[value_col]*100:.1f}%\n" if is_percent else f"- **{row['frame']} + {row['strategy']}**: {row[value_col]:.1f}\n")
+
+def write_behavior_breakdown(f, title, df, group_col=None):
+    if group_col is None:
+        agg_b = df.agg({'tp': 'sum', 'fp': 'sum', 'tn': 'sum', 'fn': 'sum'})
+        caught = agg_b['tn'] / max(1, agg_b['tn'] + agg_b['fp'])
+        passed = agg_b['fp'] / max(1, agg_b['tn'] + agg_b['fp'])
+        intro = agg_b['fn'] / max(1, agg_b['fn'] + agg_b['tp'])
+        conf = agg_b['tp'] / max(1, agg_b['fn'] + agg_b['tp'])
+        f.write(f"### {title}\n")
+        f.write(f"- **Overall** -> Caught: {caught*100:.1f}% | Passed: {passed*100:.1f}% | Introduced: {intro*100:.1f}% | Confirmed: {conf*100:.1f}%\n")
+    else:
+        f.write(f"### By {title}\n")
+        for g in sorted(df[group_col].unique()):
+            g_df = df[df[group_col] == g]
+            agg_b = g_df.agg({'tp': 'sum', 'fp': 'sum', 'tn': 'sum', 'fn': 'sum'})
+            caught = agg_b['tn'] / max(1, agg_b['tn'] + agg_b['fp'])
+            passed = agg_b['fp'] / max(1, agg_b['tn'] + agg_b['fp'])
+            intro = agg_b['fn'] / max(1, agg_b['fn'] + agg_b['tp'])
+            conf = agg_b['tp'] / max(1, agg_b['fn'] + agg_b['tp'])
+            f.write(f"- **{g}** -> Caught: {caught*100:.1f}% | Passed: {passed*100:.1f}% | Introduced: {intro*100:.1f}% | Confirmed: {conf*100:.1f}%\n")
+
+def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=None, fuzz_rows=None):
+    # Determine prefix based on mode (pilot/actual). 
+    mode = args.mode
+    valid_domains = ["math", "code", "science"]
+    domain_tag = "all" if "all" in args.domains else "_".join(sorted(set([d for d in args.domains if d in valid_domains])))
+    prefix = f"pilot_{domain_tag}_" if mode == "pilot" else f"actual_{domain_tag}_"
+    
+    # Organize outputs into domain-specific subfolders for clarity
+    out_dir = os.path.join(args.out_dir, mode, domain_tag)
+    plot_dir = os.path.join(args.plot_dir, mode, domain_tag)
+    plot_dir_md = plot_dir.replace("\\", "/")
+    
+    csv_path = os.path.join(out_dir, f'{prefix}results_granular.csv')
+    # If CSV already exists or plot directory has files, ask once
+    need_prompt = os.path.exists(csv_path) or (os.path.isdir(args.plot_dir) and any(os.scandir(args.plot_dir)))
+    if need_prompt and not args.overwrite:
+        ans = input(f"Report output (CSV and/or plots) already exists. Overwrite all? (y/n): ")
+        if ans.lower().strip() != 'y':
+            print("Skipping report generation.")
+            return
+    os.makedirs(out_dir, exist_ok=True)
+    os.makedirs(plot_dir, exist_ok=True)
+    
+    df.to_csv(csv_path, index=False)
+
+    science_gen_summary = pd.DataFrame()
+    if science_audit_df is not None and not science_audit_df.empty:
+        science_audit_df.to_csv(os.path.join(out_dir, f'{prefix}science_generation_audit.csv'), index=False)
+        science_gen_summary = science_audit_df.groupby('generator').agg(
+            Total=('item_id', 'count'),
+            Correct=('is_correct', 'sum'),
+            Parsed=('parsed_successfully', 'sum'),
+            Ambiguous=('ambiguous', 'sum')
+        ).reset_index()
+        science_gen_summary['Accuracy'] = science_gen_summary['Correct'] / science_gen_summary['Total'].clip(lower=1)
+        science_gen_summary['Parse_Rate'] = science_gen_summary['Parsed'] / science_gen_summary['Total'].clip(lower=1)
+        science_gen_summary['Ambiguous_Rate'] = science_gen_summary['Ambiguous'] / science_gen_summary['Total'].clip(lower=1)
+        science_gen_summary.to_csv(os.path.join(out_dir, f'{prefix}science_generator_summary.csv'), index=False)
+    
+    agg = df.groupby(['domain', 'verifier', 'frame', 'strategy']).agg(
+        Total=('item_id', 'count'),
+        TP=('tp', 'sum'), FP=('fp', 'sum'), TN=('tn', 'sum'), FN=('fn', 'sum'),
+        Adj_TP=('adj_tp', 'sum'), Adj_FP=('adj_fp', 'sum'), Adj_TN=('adj_tn', 'sum'), Adj_FN=('adj_fn', 'sum'),
+        Avg_Latency=('latency', 'mean'), Avg_Verbosity=('verbosity', 'mean'),
+        Formatting_Fails=('formatting_fail', 'sum'),
+        Overrode_Passing_Tests=('overrode_passing_tests', 'sum')
+    ).reset_index()
+    
+    agg['Valid_Total'] = (agg['Total'] - agg['Formatting_Fails']).clip(lower=1)
+    agg['Accuracy'] = (agg['TP'] + agg['TN']) / agg['Valid_Total']
+    agg['Adjusted_Accuracy'] = (agg['Adj_TP'] + agg['Adj_TN']) / agg['Valid_Total']
+    agg['FPR'] = agg['FP'] / (agg['FP'] + agg['TN']).replace(0, 1)
+    agg['FNR'] = agg['FN'] / (agg['FN'] + agg['TP']).replace(0, 1)
+    # Adjusted FPR/FNR use fuzz-corrected ground truth (matters for code domain where
+    # REFERENCE_BUG and BUG_CONFIRMED verdicts flip the effective ground truth label)
+    agg['Adj_FPR'] = agg['Adj_FP'] / (agg['Adj_FP'] + agg['Adj_TN']).replace(0, 1)
+    agg['Adj_FNR'] = agg['Adj_FN'] / (agg['Adj_FN'] + agg['Adj_TP']).replace(0, 1)
+    agg['Formatting_Failure_Rate'] = agg['Formatting_Fails'] / agg['Total']
+    
+    # Behavior Rates Export
+    behavior_df = agg[['domain', 'verifier', 'frame', 'strategy']].copy()
+    behavior_df['Errors_Caught_Rate'] = agg['TN'] / (agg['TN'] + agg['FP']).replace(0, 1)
+    behavior_df['Errors_Passed_Rate'] = agg['FP'] / (agg['TN'] + agg['FP']).replace(0, 1)
+    behavior_df['Errors_Introduced_Rate'] = agg['FN'] / (agg['FN'] + agg['TP']).replace(0, 1)
+    behavior_df['Correct_Confirmed_Rate'] = agg['TP'] / (agg['FN'] + agg['TP']).replace(0, 1)
+    behavior_df.to_csv(os.path.join(out_dir, f'{prefix}verifier_behavior_rates.csv'), index=False)
+
+    # Domain-specific checks are kept separate from the headline metrics so the
+    # cross-domain report remains balanced while each domain stays auditable.
+    domain_validity_df = agg.groupby('domain').agg(
+        Total=('Total', 'sum'),
+        Formatting_Fails=('Formatting_Fails', 'sum'),
+        Code_Overrode_Passing_Tests=('Overrode_Passing_Tests', 'sum')
+    ).reset_index()
+    domain_validity_df['Formatting_Failure_Rate'] = domain_validity_df['Formatting_Fails'] / domain_validity_df['Total'].clip(lower=1)
+    domain_validity_df['Science_Candidate_Parse_Rate'] = None
+    domain_validity_df['Science_Candidate_Ambiguous_Rate'] = None
+
+    science_df = df[df['domain'] == 'science'].copy()
+    science_diag = pd.DataFrame()
+    if not science_df.empty:
+        science_diag = science_df.groupby(['verifier', 'frame', 'strategy']).agg(
+            Total=('item_id', 'count'),
+            TP=('tp', 'sum'), FP=('fp', 'sum'), TN=('tn', 'sum'), FN=('fn', 'sum'),
+            Formatting_Fails=('formatting_fail', 'sum'),
+            Candidate_Parsed=('candidate_answer_parsed', 'sum'),
+            Candidate_Ambiguous=('candidate_answer_ambiguous', 'sum'),
+            Avg_Latency=('latency', 'mean'),
+            Avg_Verbosity=('verbosity', 'mean'),
+        ).reset_index()
+        science_diag['Valid_Total'] = (science_diag['Total'] - science_diag['Formatting_Fails']).clip(lower=1)
+        science_diag['Accuracy'] = (science_diag['TP'] + science_diag['TN']) / science_diag['Valid_Total']
+        science_diag['FPR'] = science_diag['FP'] / (science_diag['FP'] + science_diag['TN']).replace(0, 1)
+        science_diag['FNR'] = science_diag['FN'] / (science_diag['FN'] + science_diag['TP']).replace(0, 1)
+        science_diag['Candidate_Parse_Rate'] = science_diag['Candidate_Parsed'] / science_diag['Total'].clip(lower=1)
+        science_diag['Candidate_Ambiguous_Rate'] = science_diag['Candidate_Ambiguous'] / science_diag['Total'].clip(lower=1)
+        science_diag.to_csv(os.path.join(out_dir, f'{prefix}science_verifier_diagnostics.csv'), index=False)
+
+        science_mask = domain_validity_df['domain'] == 'science'
+        domain_validity_df.loc[science_mask, 'Science_Candidate_Parse_Rate'] = science_df['candidate_answer_parsed'].mean()
+        domain_validity_df.loc[science_mask, 'Science_Candidate_Ambiguous_Rate'] = science_df['candidate_answer_ambiguous'].mean()
+
+    domain_validity_df.to_csv(os.path.join(out_dir, f'{prefix}domain_validity_checks.csv'), index=False)
+    
+    # ── Raw Bias Metrics ────────────────────────────────────────────────────
+    bias_df = agg[agg['frame'].isin(['self', 'other'])]
+    pivot_fpr = bias_df.pivot_table(index=['domain', 'verifier', 'strategy'], columns='frame', values='FPR').reset_index()
+    if 'other' in pivot_fpr.columns and 'self' in pivot_fpr.columns:
+        pivot_fpr['FPR_Self_Bias'] = pivot_fpr['self'] - pivot_fpr['other']
+    pivot_fnr = bias_df.pivot_table(index=['domain', 'verifier', 'strategy'], columns='frame', values='FNR').reset_index()
+    if 'other' in pivot_fnr.columns and 'self' in pivot_fnr.columns:
+        pivot_fnr['FNR_Self_Bias'] = pivot_fnr['self'] - pivot_fnr['other']
+    bias_merged = pd.merge(pivot_fpr, pivot_fnr, on=['domain', 'verifier', 'strategy'], suffixes=('_FPR', '_FNR'))
+    bias_merged.to_csv(os.path.join(out_dir, f'{prefix}bias_metrics.csv'), index=False)
+
+    # ── Adjusted Bias Metrics (fuzz-corrected ground truth) ─────────────────
+    pivot_adj_fpr = bias_df.pivot_table(index=['domain', 'verifier', 'strategy'], columns='frame', values='Adj_FPR').reset_index()
+    if 'other' in pivot_adj_fpr.columns and 'self' in pivot_adj_fpr.columns:
+        pivot_adj_fpr['Adj_FPR_Self_Bias'] = pivot_adj_fpr['self'] - pivot_adj_fpr['other']
+    pivot_adj_fnr = bias_df.pivot_table(index=['domain', 'verifier', 'strategy'], columns='frame', values='Adj_FNR').reset_index()
+    if 'other' in pivot_adj_fnr.columns and 'self' in pivot_adj_fnr.columns:
+        pivot_adj_fnr['Adj_FNR_Self_Bias'] = pivot_adj_fnr['self'] - pivot_adj_fnr['other']
+    adj_bias_merged = pd.merge(pivot_adj_fpr, pivot_adj_fnr, on=['domain', 'verifier', 'strategy'], suffixes=('_Adj_FPR', '_Adj_FNR'))
+    adj_bias_merged.to_csv(os.path.join(out_dir, f'{prefix}adj_bias_metrics.csv'), index=False)
+
+    # ── P-Values (raw) ───────────────────────────────────────────────────────
+    # P-values computed PER (verifier, domain, strategy) cell so they actually test the same
+    # slice of data as the bias number they're reported next to. Expect many "not significant"
+    # results at pilot N (~20/cell) — that's honest, not a null result.
+    cell_p_values = {}
+    cell_p_values_adj = {}
+    overall_bias = df[df['frame'].isin(['self', 'other'])].groupby(['verifier', 'domain', 'strategy', 'frame']).agg(
+        TP=('tp', 'sum'), FP=('fp', 'sum'), TN=('tn', 'sum'), FN=('fn', 'sum'),
+        Adj_TP=('adj_tp', 'sum'), Adj_FP=('adj_fp', 'sum'), Adj_TN=('adj_tn', 'sum'), Adj_FN=('adj_fn', 'sum'),
+    ).reset_index()
+    for (verifier, domain, strategy), cell_df in overall_bias.groupby(['verifier', 'domain', 'strategy']):
+        if 'self' in cell_df['frame'].values and 'other' in cell_df['frame'].values:
+            sr = cell_df[cell_df['frame'] == 'self'].iloc[0]
+            or_ = cell_df[cell_df['frame'] == 'other'].iloc[0]
+            # Raw p-values
+            try: _, p_fpr, _, _ = chi2_contingency([[sr['FP'], sr['TN']], [or_['FP'], or_['TN']]])
+            except Exception: p_fpr = 1.0
+            try: _, p_fnr, _, _ = chi2_contingency([[sr['FN'], sr['TP']], [or_['FN'], or_['TP']]])
+            except Exception: p_fnr = 1.0
+            cell_p_values[(verifier, domain, strategy)] = {'fpr_p': p_fpr, 'fnr_p': p_fnr}
+            # Adjusted p-values
+            try: _, p_adj_fpr, _, _ = chi2_contingency([[sr['Adj_FP'], sr['Adj_TN']], [or_['Adj_FP'], or_['Adj_TN']]])
+            except Exception: p_adj_fpr = 1.0
+            try: _, p_adj_fnr, _, _ = chi2_contingency([[sr['Adj_FN'], sr['Adj_TP']], [or_['Adj_FN'], or_['Adj_TP']]])
+            except Exception: p_adj_fnr = 1.0
+            cell_p_values_adj[(verifier, domain, strategy)] = {'fpr_p': p_adj_fpr, 'fnr_p': p_adj_fnr}
+
+    # --- Belief-vs-Reality analysis (answers Primary Question #1) ---
+    # Crosses the TOLD frame against the ACTUAL (ground-truth) source, so we can separate
+    # "does being told you wrote it change behavior" from "does actually having written it
+    # change behavior" - these were previously conflated because ~75% of "self"-labeled rows
+    # were not actually self-authored, and the report never surfaced the actual_source field.
+    belief_reality = df[df['frame'].isin(['self', 'other'])].groupby(
+        ['verifier', 'frame', 'actual_source']
+    ).agg(
+        Total=('item_id', 'count'), TP=('tp', 'sum'), FP=('fp', 'sum'), TN=('tn', 'sum'), FN=('fn', 'sum'),
+        Valid=('formatting_fail', lambda s: (1 - s).sum())
+    ).reset_index()
+    belief_reality['Accuracy'] = (belief_reality['TP'] + belief_reality['TN']) / belief_reality['Valid'].clip(lower=1)
+    belief_reality['FPR'] = belief_reality['FP'] / (belief_reality['FP'] + belief_reality['TN']).replace(0, 1)
+    belief_reality.to_csv(os.path.join(out_dir, f'{prefix}belief_vs_reality.csv'), index=False)
+
+    sns.set_theme(style="whitegrid")
+    
+    plt.figure(figsize=(10, 6))
+    sns.barplot(data=agg, x='domain', y='Accuracy', hue='verifier', errorbar=None)
+    plt.title('Verifier Accuracy by Domain')
+    plt.ylim(0, 1.1)
+    plt.savefig(os.path.join(plot_dir, f'{prefix}accuracy_by_domain.png'))
+    plt.close()
+    
+    if 'FPR_Self_Bias' in bias_merged.columns:
+        plt.figure(figsize=(10, 6))
+        sns.barplot(data=bias_merged, x='domain', y='FPR_Self_Bias', hue='verifier', errorbar=None)
+        plt.title('Self-Preservation Bias (FPR Gap: Self - Other)')
+        plt.ylabel('FPR Difference')
+        plt.axhline(0, color='black', linestyle='--')
+        plt.savefig(os.path.join(plot_dir, f'{prefix}fpr_self_bias.png'))
+        plt.close()
+
+    if 'FNR_Self_Bias' in bias_merged.columns:
+        plt.figure(figsize=(10, 6))
+        sns.barplot(data=bias_merged, x='domain', y='FNR_Self_Bias', hue='verifier', errorbar=None)
+        plt.title('Self-Doubt Bias (FNR Gap: Self - Other) — Raw')
+        plt.ylabel('FNR Difference')
+        plt.axhline(0, color='black', linestyle='--')
+        plt.savefig(os.path.join(plot_dir, f'{prefix}fnr_self_bias.png'))
+        plt.close()
+
+    if 'Adj_FPR_Self_Bias' in adj_bias_merged.columns:
+        plt.figure(figsize=(10, 6))
+        sns.barplot(data=adj_bias_merged, x='domain', y='Adj_FPR_Self_Bias', hue='verifier', errorbar=None)
+        plt.title('Self-Preservation Bias (FPR Gap: Self - Other) — Fuzz-Adjusted')
+        plt.ylabel('Adjusted FPR Difference')
+        plt.axhline(0, color='black', linestyle='--')
+        plt.savefig(os.path.join(plot_dir, f'{prefix}adj_fpr_self_bias.png'))
+        plt.close()
+
+    if 'Adj_FNR_Self_Bias' in adj_bias_merged.columns:
+        plt.figure(figsize=(10, 6))
+        sns.barplot(data=adj_bias_merged, x='domain', y='Adj_FNR_Self_Bias', hue='verifier', errorbar=None)
+        plt.title('Self-Doubt Bias (FNR Gap: Self - Other) — Fuzz-Adjusted')
+        plt.ylabel('Adjusted FNR Difference')
+        plt.axhline(0, color='black', linestyle='--')
+        plt.savefig(os.path.join(plot_dir, f'{prefix}adj_fnr_self_bias.png'))
+        plt.close()
+
+    for verifier in df['verifier'].unique():
+        mod_df = df[df['verifier'] == verifier]
+        matrix = [[mod_df['tn'].sum(), mod_df['fp'].sum()], [mod_df['fn'].sum(), mod_df['tp'].sum()]]
+        plt.figure(figsize=(6, 5))
+        sns.heatmap(matrix, annot=True, fmt='d', cmap='Blues', xticklabels=['Predicted False', 'Predicted True'], yticklabels=['Actual False', 'Actual True'])
+        plt.title(f'Confusion Matrix - {verifier}')
+        plt.savefig(os.path.join(plot_dir, f'{prefix}confusion_matrix_{verifier}.png'))
+        plt.close()
+
+    summary_path = os.path.join(out_dir, f'{prefix}executive_summary.md')
+    with open(summary_path, 'w', encoding='utf-8') as f:
+        f.write("# Dynamic Executive Summary\n\n")
+        f.write(f"**Total Verifications Processed:** {agg['Total'].sum()}\n")
+        if fuzz_errors_removed > 0:
+            f.write(f"**Pipeline Failures Handled:** {fuzz_errors_removed} (These defaulted to basic test suite results rather than dropping rows)\n\n")
+        else:
+            f.write("\n")
+        
+        f.write("## Highest Accuracy by Domain\n")
+        f.write(f"![Accuracy Plot](../../../{plot_dir_md}/{prefix}accuracy_by_domain.png)\n\n")
+        for domain in sorted(df['domain'].unique()):
+            dom_df = agg[agg['domain'] == domain]
+            best_row = dom_df.loc[dom_df['Accuracy'].idxmax()]
+            f.write(f"- **{domain.capitalize()}**: {best_row['verifier']} (Frame: {best_row['frame']}, Strategy: {best_row['strategy']}) achieved **{best_row['Accuracy']*100:.1f}%** accuracy (**{best_row['Adjusted_Accuracy']*100:.1f}% Adjusted**).\n")
+            
+        f.write("\n## Model Preferences by Domain (Best Configurations)\n")
+        for domain in sorted(df['domain'].unique()):
+            f.write(f"### {domain.capitalize()}\n")
+            dom_df = agg[agg['domain'] == domain]
+            for model in sorted(dom_df['verifier'].unique()):
+                mod_df = dom_df[dom_df['verifier'] == model]
+                best_row = mod_df.loc[mod_df['Accuracy'].idxmax()]
+                f.write(f"- **{model}**: Prefers **{best_row['frame']}** frame & **{best_row['strategy']}** strategy (**{best_row['Accuracy']*100:.1f}%**)\n")
+
+        f.write("\n## Strategy Performance per Model (Raw Accuracy)\n")
+        strat_mod = agg.groupby(['verifier', 'strategy'])['Accuracy'].mean().unstack()
+        f.write("| Model | " + " | ".join(strat_mod.columns) + " |\n")
+        f.write("|-------|" + "|".join(["---"] * len(strat_mod.columns)) + "|\n")
+        for model, row in strat_mod.iterrows():
+            f.write(f"| **{model}** | " + " | ".join([f"{v*100:.1f}%" for v in row]) + " |\n")
+            
+        f.write("\n## Strategy Performance per Model (Adjusted Accuracy)\n")
+        strat_mod_adj = agg.groupby(['verifier', 'strategy'])['Adjusted_Accuracy'].mean().unstack()
+        f.write("| Model | " + " | ".join(strat_mod_adj.columns) + " |\n")
+        f.write("|-------|" + "|".join(["---"] * len(strat_mod_adj.columns)) + "|\n")
+        for model, row in strat_mod_adj.iterrows():
+            f.write(f"| **{model}** | " + " | ".join([f"{v*100:.1f}%" for v in row]) + " |\n")
+
+        write_breakdown_section(f, "1. Comprehensive Accuracy Breakdown (Raw)", agg, 'Accuracy', is_percent=True, invert_good=False)
+        write_breakdown_section(f, "1b. Comprehensive Accuracy Breakdown (Adjusted)", agg, 'Adjusted_Accuracy', is_percent=True, invert_good=False)
+        write_breakdown_section(f, "2. Formatting Failure Rates (NaN / Instructions Missed)", agg, 'Formatting_Failure_Rate', is_percent=True, invert_good=True)
+        write_breakdown_section(f, "3. Verbosity Analysis (Average Characters)", agg, 'Avg_Verbosity', is_percent=False, invert_good=False)
+        
+
+        f.write("\n## 5. Verifier Behavior Rates\n")
+        write_behavior_breakdown(f, "Overall Averages", df)
+        write_behavior_breakdown(f, "Domain", df, 'domain')
+        write_behavior_breakdown(f, "Strategy", df, 'strategy')
+        write_behavior_breakdown(f, "Ownership Frame", df, 'frame')
+        write_behavior_breakdown(f, "Model", df, 'verifier')
+
+        f.write("\n## 6. Statistical Bias (Self vs Other)\n")
+        f.write("### Top 3 Highest Self-Preservation Biases (FPR Gap)\n")
+        f.write("*These models were most likely to falsely approve their own mistakes.*\n")
+        f.write(f"![FPR Bias Plot](../../../{plot_dir_md}/{prefix}fpr_self_bias.png)\n\n")
+        if 'FPR_Self_Bias' in bias_merged.columns:
+            top_fpr = bias_merged.sort_values(by='FPR_Self_Bias', ascending=False).head(3)
+            for _, row in top_fpr.iterrows():
+                f.write(f"- **{row['verifier']}** ({row['domain']}, {row['strategy']}): **+{row['FPR_Self_Bias']*100:.1f}%** bias\n")
+                
+        f.write("\n### Top 3 Highest Self-Doubt Biases (FNR Gap)\n")
+        f.write("*These models were most likely to falsely reject their own correct answers.*\n")
+        f.write(f"![FNR Bias Plot](../../../{plot_dir_md}/{prefix}fnr_self_bias.png)\n\n")
+        if 'FNR_Self_Bias' in bias_merged.columns:
+            top_fnr = bias_merged.sort_values(by='FNR_Self_Bias', ascending=False).head(3)
+            for _, row in top_fnr.iterrows():
+                f.write(f"- **{row['verifier']}** ({row['domain']}, {row['strategy']}): **+{row['FNR_Self_Bias']*100:.1f}%** bias\n")
+                
+        f.write("\n### Statistical Significance (P-Values for Bias)")
+        f.write(" — Raw numbers, chi-square per (verifier, domain, strategy) cell.\n")
+        f.write("*Small pilot sample sizes (~20/cell) mean most will read as not significant; that's expected at this scale.*\n")
+        for _, row in (top_fpr.iterrows() if 'FPR_Self_Bias' in bias_merged.columns else []):
+            key = (row['verifier'], row['domain'], row['strategy'])
+            pv = cell_p_values.get(key)
+            if pv:
+                f.write(f"- **{row['verifier']}** ({row['domain']}, {row['strategy']}): FPR Bias p={pv['fpr_p']:.4f} | FNR Bias p={pv['fnr_p']:.4f}\n")
+
+        f.write("\n## 6b. Statistical Bias — Fuzz-Adjusted (Corrected Ground Truth)\n")
+        f.write("*Same analysis as Section 6 but using fuzz-adjusted ground truth for the code domain. "
+                "Rows where the fuzzer found a `REFERENCE_BUG` (reference was wrong) or `BUG_CONFIRMED` "
+                "(candidate had a real bug) are reclassified before computing FPR/FNR. "
+                "For math and science domains the adjusted numbers are identical to raw. "
+                "Differences between raw and adjusted in code domain reflect the impact of oracle corrections.*\n\n")
+        f.write("### Top 3 Highest Adjusted Self-Preservation Biases (Adj FPR Gap)\n")
+        f.write(f"![Adj FPR Bias Plot](../../../{plot_dir_md}/{prefix}adj_fpr_self_bias.png)\n\n")
+        if 'Adj_FPR_Self_Bias' in adj_bias_merged.columns:
+            top_adj_fpr = adj_bias_merged.sort_values(by='Adj_FPR_Self_Bias', ascending=False).head(3)
+            for _, row in top_adj_fpr.iterrows():
+                f.write(f"- **{row['verifier']}** ({row['domain']}, {row['strategy']}): **+{row['Adj_FPR_Self_Bias']*100:.1f}%** adjusted bias\n")
+
+        f.write("\n### Top 3 Highest Adjusted Self-Doubt Biases (Adj FNR Gap)\n")
+        f.write(f"![Adj FNR Bias Plot](../../../{plot_dir_md}/{prefix}adj_fnr_self_bias.png)\n\n")
+        if 'Adj_FNR_Self_Bias' in adj_bias_merged.columns:
+            top_adj_fnr = adj_bias_merged.sort_values(by='Adj_FNR_Self_Bias', ascending=False).head(3)
+            for _, row in top_adj_fnr.iterrows():
+                f.write(f"- **{row['verifier']}** ({row['domain']}, {row['strategy']}): **+{row['Adj_FNR_Self_Bias']*100:.1f}%** adjusted bias\n")
+
+        f.write("\n### Statistical Significance (P-Values for Adjusted Bias)\n")
+        for _, row in (top_adj_fpr.iterrows() if 'Adj_FPR_Self_Bias' in adj_bias_merged.columns else []):
+            key = (row['verifier'], row['domain'], row['strategy'])
+            pv = cell_p_values_adj.get(key)
+            if pv:
+                f.write(f"- **{row['verifier']}** ({row['domain']}, {row['strategy']}): Adj FPR Bias p={pv['fpr_p']:.4f} | Adj FNR Bias p={pv['fnr_p']:.4f}\n")
+        f.write(f"\nFull adjusted bias table: `{prefix}adj_bias_metrics.csv`.\n")
+
+        # ── Section 6c: Oracle & Fuzzing Statistics ──────────────────────────
+        f.write("\n## 6c. Oracle & Fuzzing Statistics (Code Domain)\n")
+        f.write("*These rows represent code verifications where the verifier overrode a passing execution result "
+                "(i.e. test passed but verifier said incorrect). The fuzzer ran differential testing on each and "
+                "an LLM oracle adjudicated mismatches. This section quantifies how often the verifier was right "
+                "vs. wrong, and how often the benchmark reference itself was the problem.*\n\n")
+
+        # Restrict to code overrides that actually occurred in the evaluated grid
+        code_overrides_grid = df[(df['domain'] == 'code') & (df['overrode_passing_tests'] == 1)]
+
+        if 'code' not in df['domain'].values:
+            f.write("*(No code domain data present)*\n\n")
+        elif fuzz_rows and not code_overrides_grid.empty:
+            fuzz_raw_df = pd.DataFrame(fuzz_rows)
+            rename_map = {}
+            if 'generator_model' in fuzz_raw_df.columns:
+                rename_map['generator_model'] = 'generator'
+            if 'verifier_model' in fuzz_raw_df.columns:
+                rename_map['verifier_model'] = 'verifier'
+            fuzz_raw_df = fuzz_raw_df.rename(columns=rename_map)
+
+            grid_keys = code_overrides_grid[['item_id', 'generator', 'verifier', 'frame', 'strategy']].drop_duplicates()
+            fuzz_df = grid_keys.merge(fuzz_raw_df, on=['item_id', 'generator', 'verifier', 'frame', 'strategy'], how='inner')
+
+            verdict_counts = fuzz_df['fuzz_verdict'].value_counts()
+            total_fuzz = len(fuzz_df)
+
+            f.write(f"**Total override cases fuzzed:** {total_fuzz}\n\n")
+            f.write("### Verdict Breakdown\n\n")
+            f.write("| Verdict | Count | % of Fuzzed |\n")
+            f.write("|---|---|---|\n")
+            verdict_order = ['BUG_CONFIRMED', 'REFERENCE_BUG', 'NO_DISCREPANCY', 'SKIPPED_PIPELINE_FAIL', 'ERROR']
+            descriptions = {
+                'BUG_CONFIRMED':       'Verifier was right — candidate had a real bug',
+                'REFERENCE_BUG':       '⚠️ Reference (benchmark) was wrong — candidate was actually correct',
+                'NO_DISCREPANCY':      'Verifier was wrong — fuzzer found no difference between candidate and reference',
+                'SKIPPED_PIPELINE_FAIL': 'Oracle/fuzzer could not determine correctness — fell back to basic test result',
+                'ERROR':               'Fuzzer execution or environment error — fell back to basic test result',
+            }
+            for v in verdict_order:
+                count = int(verdict_counts.get(v, 0))
+                pct = count / total_fuzz * 100 if total_fuzz > 0 else 0
+                desc = descriptions.get(v, '')
+                f.write(f"| `{v}` | {count} | {pct:.1f}% |\n")
+            f.write("\n")
+
+            # REFERENCE_BUG deep dive — these are benchmark quality issues
+            ref_bug_df = fuzz_df[fuzz_df['fuzz_verdict'] == 'REFERENCE_BUG']
+            if not ref_bug_df.empty:
+                f.write(f"### REFERENCE_BUG Deep Dive ({len(ref_bug_df)} cases)\n")
+                f.write("*These are items where the HumanEval+ reference solution itself appears to be incorrect. "
+                        "The verifier's override was justified — the candidate was actually more correct than the reference.*\n\n")
+                if 'item_id' in ref_bug_df.columns:
+                    f.write("**Affected item IDs:** " + ", ".join(map(str, sorted(ref_bug_df['item_id'].unique()))) + "\n\n")
+                by_gen = ref_bug_df['generator'].value_counts()
+                f.write("**By generator model (which model's candidate was vindicated):**\n")
+                for model, cnt in by_gen.items():
+                    f.write(f"- {model}: {cnt}\n")
+                f.write("\n")
+
+            # Per-verifier breakdown
+            f.write("### Verdicts by Verifier Model\n\n")
+            ver_pivot = fuzz_df.groupby(['verifier', 'fuzz_verdict']).size().unstack(fill_value=0)
+            for v in verdict_order:
+                if v not in ver_pivot.columns:
+                    ver_pivot[v] = 0
+            ver_pivot = ver_pivot[verdict_order]
+            cols = " | ".join(verdict_order)
+            f.write(f"| Verifier | {cols} |\n")
+            f.write("|---|" + "---|" * len(verdict_order) + "\n")
+            for verifier, row in ver_pivot.iterrows():
+                vals = " | ".join(str(int(row[v])) for v in verdict_order)
+                f.write(f"| {verifier} | {vals} |\n")
+            f.write("\n")
+
+            # Per-generator breakdown
+            f.write("### Verdicts by Generator Model\n\n")
+            gen_pivot = fuzz_df.groupby(['generator', 'fuzz_verdict']).size().unstack(fill_value=0)
+            for v in verdict_order:
+                if v not in gen_pivot.columns:
+                    gen_pivot[v] = 0
+            gen_pivot = gen_pivot[verdict_order]
+            f.write(f"| Generator | {cols} |\n")
+            f.write("|---|" + "---|" * len(verdict_order) + "\n")
+            for generator, row in gen_pivot.iterrows():
+                vals = " | ".join(str(int(row[v])) for v in verdict_order)
+                f.write(f"| {generator} | {vals} |\n")
+            f.write("\n")
+
+            # Verifier accuracy summary: what % of their overrides were justified
+            f.write("### Verifier Override Accuracy\n")
+            f.write("*% of overrides that were JUSTIFIED (BUG_CONFIRMED) vs. UNJUSTIFIED (NO_DISCREPANCY or REFERENCE_BUG)*\n\n")
+            f.write("| Verifier | Total Overrides | Justified (%) | Unjustified (%) | Inconclusive (%) |\n")
+            f.write("|---|---|---|---|---|\n")
+            for verifier, row in ver_pivot.iterrows():
+                total = row.sum()
+                justified = int(row.get('BUG_CONFIRMED', 0))
+                unjustified = int(row.get('NO_DISCREPANCY', 0)) + int(row.get('REFERENCE_BUG', 0))
+                inconclusive = int(row.get('SKIPPED_PIPELINE_FAIL', 0)) + int(row.get('ERROR', 0))
+                f.write(f"| {verifier} | {int(total)} | {justified/max(1,total)*100:.1f}% | {unjustified/max(1,total)*100:.1f}% | {inconclusive/max(1,total)*100:.1f}% |\n")
+            f.write("\n")
+        else:
+            f.write("*(No fuzzing data available — code_overrides file not found or empty)*\n\n")
+
+        f.write("\n## 7. Domain-Specific Validity Checks\n")
+        f.write("*These checks are diagnostic safeguards around domain-specific grading. They support the shared metrics above; they do not replace the common accuracy/FPR/FNR analysis.*\n\n")
+        f.write(f"Full table: `{prefix}domain_validity_checks.csv`.\n\n")
+
+        f.write("### Code: Execution Grounding\n")
+        f.write("*Instances where the code passed the test suite, but the verifier LLM overrode that execution signal and marked it INCORRECT.*\n")
+        code_agg = agg[agg['domain'] == 'code']
+        if not code_agg.empty:
+            override_sum = code_agg['Overrode_Passing_Tests'].sum()
+            f.write(f"- **Total Overrides**: {override_sum} out of {code_agg['TP'].sum() + code_agg['FN'].sum()} passing submissions.\n\n")
+            f.write("#### By Verifier Model and Strategy\n")
+            f.write("*Overrides, and their share of the passing submissions in that cell.*\n\n")
+            strategies = sorted(code_agg['strategy'].unique())
+            f.write("| Verifier | " + " | ".join(strategies) + " | All |\n")
+            f.write("|---|" + "---:|" * (len(strategies) + 1) + "\n")
+            for verifier in sorted(code_agg['verifier'].unique()):
+                v_df = code_agg[code_agg['verifier'] == verifier]
+                cells = []
+                for s in strategies + [None]:
+                    c = v_df if s is None else v_df[v_df['strategy'] == s]
+                    passing, overrides = c['TP'].sum() + c['FN'].sum(), c['Overrode_Passing_Tests'].sum()
+                    cells.append(f"{overrides} ({100 * overrides / max(passing, 1):.1f}%)")
+                f.write(f"| {verifier} | " + " | ".join(cells) + " |\n")
+        else:
+            f.write("*(No code domain data present)*\n")
+
+        f.write("\n### Science: Option Extraction Audit\n")
+        f.write("*Science grading uses the shared correctness metrics above, with an additional parser audit because GPQA answers must map cleanly to one of A-D.*\n")
+        if not science_df.empty:
+            parse_rate = science_df['candidate_answer_parsed'].mean()
+            ambiguous_rate = science_df['candidate_answer_ambiguous'].mean()
+            f.write(f"- **Candidate Parse Rate**: {parse_rate*100:.1f}% of science verification rows had a detected A-D answer.\n")
+            f.write(f"- **Ambiguous Candidate Rate**: {ambiguous_rate*100:.1f}% of science verification rows were marked ambiguous by the parser.\n")
+            if not science_gen_summary.empty:
+                best_gen = science_gen_summary.loc[science_gen_summary['Accuracy'].idxmax()]
+                f.write(f"- **Best Science Generator**: {best_gen['generator']} with {best_gen['Accuracy']*100:.1f}% generation accuracy.\n")
+            if not science_diag.empty:
+                best_cell = science_diag.loc[science_diag['Accuracy'].idxmax()]
+                worst_fp = science_diag.loc[science_diag['FPR'].idxmax()]
+                f.write(f"- **Best Science Verifier Cell**: {best_cell['verifier']} / {best_cell['frame']} / {best_cell['strategy']} at {best_cell['Accuracy']*100:.1f}% accuracy.\n")
+                f.write(f"- **Highest Science False-Approval Cell**: {worst_fp['verifier']} / {worst_fp['frame']} / {worst_fp['strategy']} with {worst_fp['FPR']*100:.1f}% FPR.\n")
+            f.write(f"Full science audit files: `{prefix}science_generation_audit.csv`, `{prefix}science_generator_summary.csv`, `{prefix}science_verifier_diagnostics.csv`.\n")
+        else:
+            f.write("*(No science domain data present)*\n")
+
+        f.write("\n### Math: Answer Matching\n")
+        math_agg = agg[agg['domain'] == 'math']
+        if not math_agg.empty:
+            f.write("- Math candidates are graded by final-answer extraction, then exact-rational and canonical-form matching: formatting-equivalent answers (plain vs. LaTeX fractions, reduced or not, decimal equivalents, sqrt/pi notation) are accepted. Algebraically equivalent but structurally different rewrites (e.g. factored vs. expanded forms) remain a limitation to mention in the paper.\n")
+            f.write(f"- **Math Verification Rows**: {int(math_agg['Total'].sum())}\n")
+        else:
+            f.write("*(No math domain data present)*\n")
+
+        f.write("\n## 8. Belief vs. Reality (Told Frame vs. Actual Authorship)\n")
+        f.write("*Answers Primary Question 1: does TELLING a verifier 'you wrote this' change its accuracy, independent of whether that's true? "
+                "Rows below cross the told frame against ground-truth authorship (actual_source).*\n\n")
+        f.write("| Verifier | Told Frame | Actually Self-Authored? | Accuracy | FPR |\n")
+        f.write("|---|---|---|---|---|\n")
+        for _, row in belief_reality.sort_values(['verifier', 'frame', 'actual_source']).iterrows():
+            actually = "Yes" if row['actual_source'] == 'self' else "No"
+            f.write(f"| {row['verifier']} | {row['frame']} | {actually} | {row['Accuracy']*100:.1f}% | {row['FPR']*100:.1f}% |\n")
+        f.write("\nRead this as 2x2 per verifier: (told self / actually self) vs (told self / actually other) vs "
+                "(told other / actually self) vs (told other / actually other). A gap between the first two rows "
+                "(same actual authorship, different label) isolates the pure *belief* effect. A gap between rows 1 and 3 "
+                f"(same label, different truth) isolates the pure *reality* effect. Full data: `{prefix}belief_vs_reality.csv`.\n")
+
+        f.write("\n## 9. Confusion Matrices (Visuals & Raw Data)\n")
+        for verifier in sorted(df['verifier'].unique()):
+            mod_df = df[df['verifier'] == verifier]
+            tp = mod_df['tp'].sum()
+            fp = mod_df['fp'].sum()
+            tn = mod_df['tn'].sum()
+            fn = mod_df['fn'].sum()
+            f.write(f"### {verifier}\n")
+            f.write(f"**True Positives:** {tp} | **False Positives:** {fp} | **True Negatives:** {tn} | **False Negatives:** {fn}\n\n")
+            f.write(f"![Confusion Matrix {verifier}](../../../{plot_dir_md}/{prefix}confusion_matrix_{verifier}.png)\n")
+            
+    print(f"Reports successfully generated in {out_dir}/ and {plot_dir}/")
+
+def main():
+    args = parse_args()
+        
+    print("Grading generated candidates against ground truth...")
+    graded, science_audit_df = load_and_grade(args)
+    
+    print("Loading fuzzer override results...")
+    fuzz_dict, fuzz_rows = load_fuzz_results(args)
+    
+    print("Analyzing verifications...")
+    df, fuzz_errors_removed = analyze_verifications(args, graded, fuzz_dict)
+    
+    if not df.empty:
+        print("Generating reports and plots...")
+        generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df, fuzz_rows)
+    else:
+        print("No verified data found to report on.")
+
+if __name__ == "__main__":
+    main()

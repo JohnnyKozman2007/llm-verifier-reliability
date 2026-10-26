@@ -1,0 +1,365 @@
+{
+  "science": {
+    "cot": {
+      "rules": [
+        {
+          "n": 599,
+          "acc": 0.5326,
+          "catch": 0.2328,
+          "confirm": 0.9129,
+          "bal_acc": 0.5729,
+          "fpr": 0.7672,
+          "fnr": 0.0871,
+          "precision": 0.4839,
+          "f1": 0.6325,
+          "rule": "1-of-3",
+          "k": 1
+        },
+        {
+          "n": 599,
+          "acc": 0.581,
+          "catch": 0.4299,
+          "confirm": 0.7727,
+          "bal_acc": 0.6013,
+          "fpr": 0.5701,
+          "fnr": 0.2273,
+          "precision": 0.5165,
+          "f1": 0.6191,
+          "rule": "2-of-3",
+          "k": 2
+        },
+        {
+          "n": 599,
+          "acc": 0.6277,
+          "catch": 0.6776,
+          "confirm": 0.5644,
+          "bal_acc": 0.621,
+          "fpr": 0.3224,
+          "fnr": 0.4356,
+          "precision": 0.5798,
+          "f1": 0.572,
+          "rule": "3-of-3",
+          "k": 3
+        }
+      ],
+      "singles": [
+        {
+          "n": 449,
+          "acc": 0.5835,
+          "catch": 0.438,
+          "confirm": 0.7801,
+          "bal_acc": 0.609,
+          "fpr": 0.562,
+          "fnr": 0.2199,
+          "precision": 0.5068,
+          "f1": 0.6144,
+          "model": "qwen"
+        },
+        {
+          "n": 449,
+          "acc": 0.637,
+          "catch": 0.6832,
+          "confirm": 0.5722,
+          "bal_acc": 0.6277,
+          "fpr": 0.3168,
+          "fnr": 0.4278,
+          "precision": 0.5632,
+          "f1": 0.5676,
+          "model": "deepseek"
+        },
+        {
+          "n": 449,
+          "acc": 0.5813,
+          "catch": 0.4458,
+          "confirm": 0.75,
+          "bal_acc": 0.5979,
+          "fpr": 0.5542,
+          "fnr": 0.25,
+          "precision": 0.5208,
+          "f1": 0.6148,
+          "model": "llama"
+        },
+        {
+          "n": 450,
+          "acc": 0.52,
+          "catch": 0.1949,
+          "confirm": 0.8785,
+          "bal_acc": 0.5367,
+          "fpr": 0.8051,
+          "fnr": 0.1215,
+          "precision": 0.4974,
+          "f1": 0.6351,
+          "model": "mistral"
+        }
+      ],
+      "best_ensemble": {
+        "n": 599,
+        "acc": 0.6277,
+        "catch": 0.6776,
+        "confirm": 0.5644,
+        "bal_acc": 0.621,
+        "fpr": 0.3224,
+        "fnr": 0.4356,
+        "precision": 0.5798,
+        "f1": 0.572,
+        "rule": "3-of-3",
+        "k": 3
+      },
+      "best_single": {
+        "n": 449,
+        "acc": 0.637,
+        "catch": 0.6832,
+        "confirm": 0.5722,
+        "bal_acc": 0.6277,
+        "fpr": 0.3168,
+        "fnr": 0.4278,
+        "precision": 0.5632,
+        "f1": 0.5676,
+        "model": "deepseek"
+      },
+      "advantage_pp": -0.67
+    }
+  },
+  "math": {
+    "cot": {
+      "rules": [
+        {
+          "n": 569,
+          "acc": 0.8155,
+          "catch": 0.3176,
+          "confirm": 0.9905,
+          "bal_acc": 0.654,
+          "fpr": 0.6824,
+          "fnr": 0.0095,
+          "precision": 0.805,
+          "f1": 0.8882,
+          "rule": "1-of-3",
+          "k": 1
+        },
+        {
+          "n": 569,
+          "acc": 0.8401,
+          "catch": 0.473,
+          "confirm": 0.9691,
+          "bal_acc": 0.721,
+          "fpr": 0.527,
+          "fnr": 0.0309,
+          "precision": 0.8395,
+          "f1": 0.8997,
+          "rule": "2-of-3",
+          "k": 2
+        },
+        {
+          "n": 569,
+          "acc": 0.8453,
+          "catch": 0.6757,
+          "confirm": 0.905,
+          "bal_acc": 0.7903,
+          "fpr": 0.3243,
+          "fnr": 0.095,
+          "precision": 0.8881,
+          "f1": 0.8965,
+          "rule": "3-of-3",
+          "k": 3
+        }
+      ],
+      "singles": [
+        {
+          "n": 433,
+          "acc": 0.843,
+          "catch": 0.5431,
+          "confirm": 0.9527,
+          "bal_acc": 0.7479,
+          "fpr": 0.4569,
+          "fnr": 0.0473,
+          "precision": 0.8507,
+          "f1": 0.8988,
+          "model": "qwen"
+        },
+        {
+          "n": 430,
+          "acc": 0.8419,
+          "catch": 0.6833,
+          "confirm": 0.9032,
+          "bal_acc": 0.7933,
+          "fpr": 0.3167,
+          "fnr": 0.0968,
+          "precision": 0.8805,
+          "f1": 0.8917,
+          "model": "deepseek"
+        },
+        {
+          "n": 424,
+          "acc": 0.8113,
+          "catch": 0.4338,
+          "confirm": 0.9896,
+          "bal_acc": 0.7117,
+          "fpr": 0.5662,
+          "fnr": 0.0104,
+          "precision": 0.7873,
+          "f1": 0.8769,
+          "model": "llama"
+        },
+        {
+          "n": 420,
+          "acc": 0.8381,
+          "catch": 0.1806,
+          "confirm": 0.9741,
+          "bal_acc": 0.5773,
+          "fpr": 0.8194,
+          "fnr": 0.0259,
+          "precision": 0.8518,
+          "f1": 0.9088,
+          "model": "mistral"
+        }
+      ],
+      "best_ensemble": {
+        "n": 569,
+        "acc": 0.8453,
+        "catch": 0.6757,
+        "confirm": 0.905,
+        "bal_acc": 0.7903,
+        "fpr": 0.3243,
+        "fnr": 0.095,
+        "precision": 0.8881,
+        "f1": 0.8965,
+        "rule": "3-of-3",
+        "k": 3
+      },
+      "best_single": {
+        "n": 430,
+        "acc": 0.8419,
+        "catch": 0.6833,
+        "confirm": 0.9032,
+        "bal_acc": 0.7933,
+        "fpr": 0.3167,
+        "fnr": 0.0968,
+        "precision": 0.8805,
+        "f1": 0.8917,
+        "model": "deepseek"
+      },
+      "advantage_pp": -0.29
+    }
+  },
+  "code": {
+    "cot": {
+      "rules": [
+        {
+          "n": 600,
+          "acc": 0.8667,
+          "catch": 0.5833,
+          "confirm": 0.9881,
+          "bal_acc": 0.7857,
+          "fpr": 0.4167,
+          "fnr": 0.0119,
+          "precision": 0.8469,
+          "f1": 0.9121,
+          "rule": "1-of-3",
+          "k": 1
+        },
+        {
+          "n": 600,
+          "acc": 0.9367,
+          "catch": 0.8889,
+          "confirm": 0.9571,
+          "bal_acc": 0.923,
+          "fpr": 0.1111,
+          "fnr": 0.0429,
+          "precision": 0.9526,
+          "f1": 0.9549,
+          "rule": "2-of-3",
+          "k": 2
+        },
+        {
+          "n": 600,
+          "acc": 0.7417,
+          "catch": 0.9833,
+          "confirm": 0.6381,
+          "bal_acc": 0.8107,
+          "fpr": 0.0167,
+          "fnr": 0.3619,
+          "precision": 0.9889,
+          "f1": 0.7757,
+          "rule": "3-of-3",
+          "k": 3
+        }
+      ],
+      "singles": [
+        {
+          "n": 450,
+          "acc": 0.9089,
+          "catch": 0.7692,
+          "confirm": 0.9739,
+          "bal_acc": 0.8716,
+          "fpr": 0.2308,
+          "fnr": 0.0261,
+          "precision": 0.9006,
+          "f1": 0.9358,
+          "model": "qwen"
+        },
+        {
+          "n": 450,
+          "acc": 0.8911,
+          "catch": 0.7417,
+          "confirm": 0.9666,
+          "bal_acc": 0.8541,
+          "fpr": 0.2583,
+          "fnr": 0.0334,
+          "precision": 0.8811,
+          "f1": 0.9219,
+          "model": "deepseek"
+        },
+        {
+          "n": 450,
+          "acc": 0.9133,
+          "catch": 0.8647,
+          "confirm": 0.9338,
+          "bal_acc": 0.8992,
+          "fpr": 0.1353,
+          "fnr": 0.0662,
+          "precision": 0.9427,
+          "f1": 0.9382,
+          "model": "llama"
+        },
+        {
+          "n": 450,
+          "acc": 0.68,
+          "catch": 0.9292,
+          "confirm": 0.5964,
+          "bal_acc": 0.7628,
+          "fpr": 0.0708,
+          "fnr": 0.4036,
+          "precision": 0.9617,
+          "f1": 0.7363,
+          "model": "mistral"
+        }
+      ],
+      "best_ensemble": {
+        "n": 600,
+        "acc": 0.9367,
+        "catch": 0.8889,
+        "confirm": 0.9571,
+        "bal_acc": 0.923,
+        "fpr": 0.1111,
+        "fnr": 0.0429,
+        "precision": 0.9526,
+        "f1": 0.9549,
+        "rule": "2-of-3",
+        "k": 2
+      },
+      "best_single": {
+        "n": 450,
+        "acc": 0.9133,
+        "catch": 0.8647,
+        "confirm": 0.9338,
+        "bal_acc": 0.8992,
+        "fpr": 0.1353,
+        "fnr": 0.0662,
+        "precision": 0.9427,
+        "f1": 0.9382,
+        "model": "llama"
+      },
+      "advantage_pp": 2.38
+    }
+  }
+}

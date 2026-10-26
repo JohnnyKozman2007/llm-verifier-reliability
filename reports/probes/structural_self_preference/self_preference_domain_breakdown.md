@@ -1,0 +1,70 @@
+# Structural Self-Preference Metrics (Domain Breakdown)
+
+Each item counts once. Its repeats are the identical prompt re-sent once per main-grid cell it qualified in, so counts are item-equivalents averaged over those repeats. Every row is two API calls (candidate order swapped). 55 of the 87 probed items are still both wrong under the current grades; the rest are excluded.
+
+## VERIFIER: DEEPSEEK
+### Domain: ALL (55 items, 341 rows, 682 API calls)
+- **Selected its OWN algorithm:** 9.1% (5.0)
+- **Selected the OTHER algorithm:** 6.0% (3.3)
+- **Consistently voted 'Both Incorrect':** 10.9% (6.0)
+- **Consistently voted 'Both Correct':** 39.4% (21.7)
+- **Failed due to Position Bias (A/B):** 7.6% (4.2)
+- **Inconsistent / Tie / Refusal:** 27.1% (14.9)
+
+### Domain: CODE (13 items, 54 rows, 108 API calls)
+- **Selected its OWN algorithm:** 16.7% (2.2)
+- **Selected the OTHER algorithm:** 12.8% (1.7)
+- **Consistently voted 'Both Incorrect':** 0.0% (0.0)
+- **Consistently voted 'Both Correct':** 31.5% (4.1)
+- **Failed due to Position Bias (A/B):** 13.6% (1.8)
+- **Inconsistent / Tie / Refusal:** 25.4% (3.3)
+
+### Domain: MATH (10 items, 66 rows, 132 API calls)
+- **Selected its OWN algorithm:** 7.8% (0.8)
+- **Selected the OTHER algorithm:** 12.5% (1.2)
+- **Consistently voted 'Both Incorrect':** 0.0% (0.0)
+- **Consistently voted 'Both Correct':** 21.9% (2.2)
+- **Failed due to Position Bias (A/B):** 20.2% (2.0)
+- **Inconsistent / Tie / Refusal:** 37.6% (3.8)
+
+### Domain: SCIENCE (32 items, 221 rows, 442 API calls)
+- **Selected its OWN algorithm:** 6.4% (2.0)
+- **Selected the OTHER algorithm:** 1.2% (0.4)
+- **Consistently voted 'Both Incorrect':** 18.8% (6.0)
+- **Consistently voted 'Both Correct':** 48.0% (15.4)
+- **Failed due to Position Bias (A/B):** 1.2% (0.4)
+- **Inconsistent / Tie / Refusal:** 24.5% (7.8)
+
+## VERIFIER: QWEN
+### Domain: ALL (55 items, 341 rows, 682 API calls)
+- **Selected its OWN algorithm:** 20.6% (11.3)
+- **Selected the OTHER algorithm:** 13.5% (7.4)
+- **Consistently voted 'Both Incorrect':** 1.8% (1.0)
+- **Consistently voted 'Both Correct':** 29.3% (16.1)
+- **Failed due to Position Bias (A/B):** 16.6% (9.1)
+- **Inconsistent / Tie / Refusal:** 18.2% (10.0)
+
+### Domain: CODE (13 items, 54 rows, 108 API calls)
+- **Selected its OWN algorithm:** 35.9% (4.7)
+- **Selected the OTHER algorithm:** 15.4% (2.0)
+- **Consistently voted 'Both Incorrect':** 0.0% (0.0)
+- **Consistently voted 'Both Correct':** 18.5% (2.4)
+- **Failed due to Position Bias (A/B):** 23.1% (3.0)
+- **Inconsistent / Tie / Refusal:** 7.2% (0.9)
+
+### Domain: MATH (10 items, 66 rows, 132 API calls)
+- **Selected its OWN algorithm:** 34.3% (3.4)
+- **Selected the OTHER algorithm:** 11.2% (1.1)
+- **Consistently voted 'Both Incorrect':** 0.0% (0.0)
+- **Consistently voted 'Both Correct':** 18.6% (1.9)
+- **Failed due to Position Bias (A/B):** 9.6% (1.0)
+- **Inconsistent / Tie / Refusal:** 26.3% (2.6)
+
+### Domain: SCIENCE (32 items, 221 rows, 442 API calls)
+- **Selected its OWN algorithm:** 10.1% (3.2)
+- **Selected the OTHER algorithm:** 13.4% (4.3)
+- **Consistently voted 'Both Incorrect':** 3.1% (1.0)
+- **Consistently voted 'Both Correct':** 37.1% (11.9)
+- **Failed due to Position Bias (A/B):** 16.2% (5.2)
+- **Inconsistent / Tie / Refusal:** 20.2% (6.5)
+
