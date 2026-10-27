@@ -1,0 +1,8 @@
+% Camera-ready build for the NeurIPS 2026 Workshop "Who Verifies the Agents? Toward Reliable
+% Agent Development". The paper text lives in ../paper.tex; only the footer differs.
+% Build from this folder: latexmk -pdf main.tex
+\newcommand{\workshopnotice}{Workshop on Who Verifies the Agents? Toward Reliable Agent Development, NeurIPS 2026.}
+\makeatletter
+\def\input@path{{../}}
+\makeatother
+\input{paper.tex}

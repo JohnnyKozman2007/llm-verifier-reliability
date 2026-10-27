@@ -1,0 +1,9 @@
+% Camera-ready build for the NeurIPS 2026 Workshop "TAE (Trust-AI-Eval): Can We Trust AI
+% Evaluation?". The paper text lives in ../paper.tex; only the footer differs. The footer is
+% what [dblblindworkshop, final] with this \workshoptitle produces, minus the "." the .sty
+% appends after the title's "?". Build from this folder: latexmk -pdf main.tex
+\newcommand{\workshopnotice}{40th Conference on Neural Information Processing Systems (NeurIPS 2026). Workshop: TAE (Trust-AI-Eval): Can We Trust AI Evaluation?}
+\makeatletter
+\def\input@path{{../}}
+\makeatother
+\input{paper.tex}

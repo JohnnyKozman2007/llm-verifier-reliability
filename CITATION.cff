@@ -25,6 +25,6 @@ preferred-citation:
       given-names: Tilak
     - family-names: Waddepalli
       given-names: Arushi
-  notes: "Workshop on Who Verifies the Agents? Toward Reliable Agent Development, NeurIPS 2026"
+  notes: "NeurIPS 2026 Workshops: Who Verifies the Agents? Toward Reliable Agent Development; TAE (Trust-AI-Eval): Can We Trust AI Evaluation?"
   year: 2026
   url: "https://github.com/JohnnyKozman2007/llm-verifier-reliability"

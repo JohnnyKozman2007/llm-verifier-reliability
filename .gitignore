@@ -16,3 +16,11 @@ reports/pilot/
 
 tests/.tmp_release_*
 
+# LaTeX build intermediates (paper/, paper/verify-agents/, paper/tae/)
+paper/**/*.aux
+paper/**/*.out
+paper/**/*.fls
+paper/**/*.fdb_latexmk
+paper/**/*.synctex.gz
+paper/paper.pdf
+paper/*/main.pdf
