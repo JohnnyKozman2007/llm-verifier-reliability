@@ -2,7 +2,11 @@
 
 Code, prompts, and verification traces for **"Neither Blinding Nor a Jury, Neither
 Capability Nor Strategy: What Brings a Verifier to Reliability"**
-(Workshop on Who Verifies the Agents? Toward Reliable Agent Development, NeurIPS 2026).
+accepted at two NeurIPS 2026 workshops:
+- Workshop on Who Verifies the Agents? Toward Reliable Agent Development, NeurIPS 2026
+- Workshop on TAE (Trust-AI-Eval): Can We Trust AI Evaluation?, NeurIPS 2026
+
+The two camera-ready builds share one paper body and differ only in the footer.
 
 64,800 verification calls: 4 generators x 4 verifiers x 3 authorship frames x 3 strategies,
 over 3 domains (HumanEval+, MATH, GPQA-Diamond) of 150 items each.
@@ -12,7 +16,8 @@ over 3 domains (HumanEval+, MATH, GPQA-Diamond) of 150 items each.
 - `data/` benchmark items, candidates, verification traces, fuzzing results
 - `reports/` summary CSVs and probe reports; `plots/` figures
 - `prompts/` rewrite prompts used in the style-transfer probe
-- `paper/` workshop paper sources (numbers aligned with the corrected MATH grader)
+- `paper/` workshop paper sources (numbers aligned with the corrected MATH grader): `paper.tex` is
+  the shared body; `verify-agents/main.tex` and `tae/main.tex` build each workshop's camera-ready
 
 GPQA-Diamond item text is withheld in every released artifact. Science traces carry item
 ids, answer letters, extracted-parse metadata and verdicts, but no stems, no option strings
@@ -102,8 +107,8 @@ Delete that file only if you mean to re-grade code from scratch.
                   What Brings a Verifier to Reliability},
   author       = {Kozman, Johnny and Parajuli, Tilak and Waddepalli, Arushi},
   year         = {2026},
-  howpublished = {Workshop on Who Verifies the Agents? Toward Reliable Agent Development,
-                  NeurIPS 2026},
+  howpublished = {NeurIPS 2026 Workshops: Who Verifies the Agents? Toward Reliable Agent
+                  Development; TAE (Trust-AI-Eval): Can We Trust AI Evaluation?},
   url          = {https://github.com/JohnnyKozman2007/llm-verifier-reliability}
 }
 ```
