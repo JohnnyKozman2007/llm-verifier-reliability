@@ -81,8 +81,8 @@
   frames and three verification strategies over three task domains. Two fixes commonly
   proposed for unreliable LLM judges both fail, and the failures are sharper than
   intuition suggests. The first is to blind the judge to authorship. Self-preference is
-  real, but it is not about the self: telling a model it wrote an answer moves false
-  approval by under a point, while a model that \emph{actually} wrote the answer
+  real, but it is not about the self: telling a model that it wrote an answer, rather than that
+  another model did, moves false approval by under a point on average, while a model that \emph{actually} wrote the answer
   approves its own errors 11.1 percentage points more often than the other judges do,
   holding both the error and each judge's overall leniency fixed (5.6 points without the
   smallest model)---nearly all of the effect
@@ -97,7 +97,7 @@
   judges fail together rather than independently, so adding judges buys little: no
   cross-validated gain in science and at most 3 points of balanced accuracy in math. Only
   an environment signal changes the picture, and even then judges override a passing result
-  on 9.6\% of calls---mostly the smallest judge when asked to reason (36--48\%), the
+  on 9.6\% of calls on test-passing code---mostly the smallest judge when asked to reason (36--48\%), the
   others 1--5\%---with independent differential testing confirming under
   8\% of those overrides as justified. Across these domains, verifier reliability
   strongly correlates with the signal the environment supplies, rather than the model reading it.
@@ -139,8 +139,9 @@ matching, graduate-level science admits neither. In total, 64{,}800 verification
 over 450 items.
 
 Self-preference survives the intervention aimed at it, because that intervention targets
-the wrong mechanism. Telling a model it wrote an answer moves false approval by under a
-percentage point, in the direction opposite to self-preference, while a model that
+the wrong mechanism. Telling a model that it wrote an answer, rather than that another model did, moves false approval by under a
+percentage point on average across judges, and by at most 2.6 points toward self-preference for
+any one judge, while a model that
 \emph{actually} wrote the answer approves its own errors 11.1 percentage points more often, holding
 both the error and the judge fixed; the effect is uneven across models and halves to 5.6
 points without the smallest. Nor is that gap self-recognition: rewriting an answer into another
@@ -164,7 +165,7 @@ judge is shown an execution result, against 59.2\%--69.0\% where it must judge u
 (Appendix~\ref{app:capability}), and
 the excess of answers that fool every judge at once disappears in the grounded case. Even then the
 judge is not the source of that reliability: judges override a passing runtime result on
-9.6\% of such calls, nearly three quarters of them from Mistral under the two reasoning strategies
+9.6\% of calls on test-passing code, nearly three quarters of them from Mistral under the two reasoning strategies
 (36\% and 48\% of its passing runs, against 1--5\% for every other judge and strategy), and
 independent differential testing confirms under 8\% of those overrides.
 
@@ -172,7 +173,7 @@ independent differential testing confirms under 8\% of those overrides.
 (i) A protocol separating believed from actual authorship, with estimators that hold the
 specific error, and then also the judge, fixed. (ii) Three probes---style
 transfer, structural preference, and self-recognition with a consistency control---that
-jointly rule out self-recognition as the mechanism behind self-preference. (iii) Evidence
+jointly argue against self-recognition as the mechanism behind self-preference. (iii) Evidence
 that error detectability falls with generator strength and that judge failures are
 correlated, which together help explain why stronger judges, better prompts and larger
 panels do little on ungrounded tasks. (iv) Evidence that verifier reliability strongly correlates
@@ -223,6 +224,7 @@ or model answer text reappears (Appendix~\ref{app:release}).
   \label{tab:domains}
   \centering
   \small
+  \resizebox{\textwidth}{!}{%
   \begin{tabular}{llll}
     \toprule
     Domain & Benchmark & Correctness established by & Signal shown to judge \\
@@ -231,7 +233,7 @@ or model answer text reappears (Appendix~\ref{app:release}).
     Math    & MATH           & Final-answer extraction, semantic-equivalence match  & None \\
     Science & GPQA-Diamond   & Option letter; ambiguous parses fail    & None \\
     \bottomrule
-  \end{tabular}
+  \end{tabular}}
 \end{table}
 
 \paragraph{Models.} Four instruction-tuned models act as both generators and verifiers:
@@ -278,9 +280,9 @@ Appendix~\ref{app:execution}.
 
 \paragraph{Verdicts and metrics.}
 Verifiers return JSON; a verdict is read from a single boolean \texttt{is\_correct}
-field, with fallback regex recovery for fenced or escaped output
-(see Appendix~\ref{app:prompts}). Of 64{,}800 calls, 277 (0.43\%) failed strict JSON
-parsing; the fallback recovered a verdict for every one of them, so no call is dropped,
+field, with fallback parsing for fenced output, a science-only escape repair and a final regex
+recovery (see Appendix~\ref{app:prompts}). Of 64{,}800 calls, 277 (0.43\%) yielded no verdict from the JSON
+parser and its repair steps; the regex fallback recovered a verdict for every one of them, so no call is dropped,
 though the error-stratified estimator (\S\ref{sec:results-belief}) excludes them. All 277
 come from the two reasoning strategies, and 262 of them from the smallest model (Mistral-Nemo).
 
@@ -312,7 +314,7 @@ We report the following metrics, computed at the item level throughout:
 The full accuracy map across every domain, verifier, told frame, actual authorship,
 and strategy (Appendix~\ref{app:fullmap}) is what the two probes below were designed
 to explain. The single best configuration per domain already hints at the story:
-Mistral judging its own code under a bare verdict reaches 97.8\% (Table~\ref{tab:best-combo}),
+Mistral, told the code is its own, reaches 97.8\% under a bare verdict (Table~\ref{tab:best-combo}),
 far above its 60--73\% range for the exact same task under a rubric strategy, while the
 best math configuration trails by roughly 13 points and the best science configuration by
 over 30 points, regardless
@@ -370,8 +372,11 @@ The effect is not uniform: it is largest for Mistral's errors ($+35.8$ pp) and r
 DeepSeek's ($-11.7$ pp), whose errors the other judges approve more readily than DeepSeek
 itself does, and by judge, DeepSeek and Qwen approve their own errors about 22 points more
 often than other models' errors, Llama 5 points more, and Mistral no more often. By contrast,
-the told label moves false approval by $-0.4$ pp on self-authored errors and
-$-0.8$ pp on other-authored ones---small, and in the direction opposite to self-preference.
+telling a judge an answer is its own rather than another model's moves false approval by
+$-0.3$ pp on self-authored errors and $-0.8$ pp on other-authored ones, pooled over judges. The
+negative sign comes from Llama alone, which turns stricter when told it is the author ($-7.5$ and
+$-4.6$ pp); per judge and authorship the other three move between $+0.2$ and $+2.6$ pp, far short
+of the 11.1-point effect of actual authorship.
 
 Three probes test what drives the reality effect. \textbf{(i) Structural preference.}
 Presented with two incorrect candidates, one its own, DeepSeek picked its own on 9.1\% of
@@ -381,12 +386,14 @@ too weak to account for an 11-point gap. \textbf{(ii) Style.} Rewriting every ca
 another model's prose, against a placebo rewrite of equal length and disruption, moved
 false approval by $+0.2$ pp for DeepSeek (McNemar $p=1.00$) and $-2.3$ pp for Qwen
 ($p=0.06$) (Table~\ref{tab:style-transfer}). Prose style is not the signal.
-\textbf{(iii) Self-recognition.} Asked to pick its own answer from four, no model exceeds
-chance once conclusion-matching is controlled for: in 9 of 12 model$\times$domain cells
-apparent recognition is explained entirely by the model selecting whatever answer matches
-the conclusion it originally reached, and a consistency control collapses the strongest
-mediation from $+22.2$ pp to $+2.8$ pp ($p=0.73$). What persists is the conclusion, not the
-authorship. Full probe methodology is in Appendix~\ref{app:framing}.
+\textbf{(iii) Self-recognition.} Asked to pick its own answer from four, a model often picks an
+answer that reaches its own original conclusion; once that is controlled for, only
+DeepSeek in science still exceeds chance after Bonferroni correction, no other model$\times$domain
+cell does, and Mistral falls below that baseline in science and code (Table~\ref{tab:self-rec-results}).
+Even in DeepSeek's cell, the mediation of self-approval falls from $+22.2$ pp to $+2.8$ pp under a
+consistency control (item-level $p=0.88$), though with nine comparison items the control cannot
+exclude an effect of the original size (Appendix~\ref{app:self-recognition}).
+What persists is the conclusion, not the authorship. Full probe methodology is in Appendix~\ref{app:framing}.
 
 \begingroup
 \setlength{\intextsep}{5pt plus 1pt minus 1pt}
@@ -400,6 +407,7 @@ authorship. Full probe methodology is in Appendix~\ref{app:framing}.
 false approval and balanced accuracy reveal it. Llama's accuracy advantage on its own work comes from fewer
 false rejections, not from catching its own errors.}
 \label{tab:belief-reality}
+\resizebox{\textwidth}{!}{%
 \begin{tabular}{lcccccc}
 \toprule
 & \multicolumn{2}{c}{Accuracy (\%)} & \multicolumn{2}{c}{Balanced acc (\%)} & \multicolumn{2}{c}{False approval (\%)} \\
@@ -411,7 +419,7 @@ Qwen     & 74.2 & 79.1 & 65.1 & 75.6 & 62.2 & 40.1 \\
 Llama    & 79.8 & 77.1 & 72.8 & 73.4 & 47.3 & 43.5 \\
 Mistral  & 60.7 & 70.7 & 62.7 & 61.9 & 61.6 & 62.5 \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \end{table}
 
 \begin{table}[H]
@@ -546,11 +554,14 @@ environmental signal fail together rather than independently, a stronger generat
 are correspondingly harder for any of them to catch in ungrounded domains, and none of the
 three prompting strategies we test closes the gap---so larger panels and better prompting
 deliver far less than they promise. Blinding
-judges to authorship misses as well: models are nearly indifferent to the \emph{told} frame,
-varying by under one percentage point, yet approve their own errors 11.1 points more often
-(5.6 without the smallest model) when they truly wrote them. That gap survives a placebo-controlled style transfer and
-dissolves under a consistency control, so what persists is the conclusion a model still
-holds, not recognition of its own prose. Reliable verification in our experiments
+judges to authorship misses as well: averaged over judges, being \emph{told} an answer is its own rather than
+another model's moves false approval by under one percentage point, and the largest rise any
+judge shows is 2.6 points, yet models approve their own errors 11.1 points more often
+(5.6 without the smallest model) when they truly wrote them. That gap survives a placebo-controlled
+style transfer, and in the one cell where recognition beats conclusion-matching chance (DeepSeek, science)
+the link between recognising an answer and approving it is not detectable under a consistency
+control, so what persists is the conclusion a model still holds, not recognition of
+its own prose. Reliable verification in our experiments
 strongly correlates with the presence of an environmental signal---though not with blind trust in the judge reading it: when a verifier overrides
 a passing test suite, differential fuzzing confirms the override in only 7.3\% of cases and finds no supporting divergence in 77.2\%.
 The path forward points toward verifiable environments, and judges aligned to defer to them.
@@ -737,11 +748,12 @@ asks for criterion-by-criterion scoring.
 \subsection{Verdict Parsing and Fallback}
 
 Verdicts are extracted from the \texttt{is\_correct} field of the returned JSON.
-If strict JSON parsing fails (the most common cause being unescaped backslashes
-in science/math \textsc{CoT} and \textsc{Rubric} responses), a regex fallback
-recovers the value from patterns of the form
-\texttt{is\_correct\,:\,true/false}. Strict parsing failed on 277 of 64{,}800 calls
-(0.43\%; 267 math, 10 science), and the fallback recovered a verdict for every one, so no
+If strict JSON parsing fails, the parser retries on a fenced \texttt{json} block or the outermost
+braces and, for science only, after repairing LaTeX backslashes. Calls that still yield no
+verdict go to a regex fallback that recovers the value from patterns of the form
+\texttt{is\_correct\,:\,true/false}. 277 of 64{,}800 calls (0.43\%; 267 math, 10 science)
+reached this fallback, every math one because of unescaped backslashes in a \textsc{CoT} or
+\textsc{Rubric} response, and it recovered a verdict for every one, so no
 call is dropped; only the error-stratified estimator excludes these 277.
 
 \section{Belief vs.\ Reality and Framing Probes: Full Breakdown}
@@ -800,10 +812,10 @@ This is the map that motivated the probes in Section~\ref{sec:results-belief} an
 Section~\ref{sec:results-detect}: the domain gap and the strategy sensitivity visible
 here (most sharply in Mistral's code results) are what those probes set out to
 explain. Every cell below is accuracy (\%) for a (domain, verifier, actual-authorship,
-strategy) combination, averaged over the three told-authorship frames---which
-Section~\ref{sec:results-belief} shows move accuracy by under a point in almost every
-case, so collapsing over frame here does not hide anything the main text has not
-already addressed. ``Self'' means the verifier is judging a candidate it actually
+strategy) combination, averaged over the three told-authorship frames. Pooled over domains and
+strategies, the frame moves a model's accuracy by at most 2.2 points
+(Section~\ref{sec:results-belief}); within a single cell below it moves accuracy by up to 6.9
+points (Mistral, code, \textsc{Rubric}, other-authored). ``Self'' means the verifier is judging a candidate it actually
 generated; ``Other'' means it is judging a candidate generated by a different model.
 
 \begin{table}[H]
@@ -858,10 +870,10 @@ Qwen     & Self  & 79.8 & 80.7 & 80.0 \\
 Verifier & Actual author & CoT & Direct & Rubric \\
 \midrule
 DeepSeek & Other & 64.8 & 64.4 & 63.2 \\
-DeepSeek & Self  & 64.5 & 59.1 & 63.6 \\
-Llama    & Other & 59.2 & 56.8 & 58.5 \\
+DeepSeek & Self  & 64.4 & 59.1 & 63.6 \\
+Llama    & Other & 59.2 & 56.7 & 58.5 \\
 Llama    & Self  & 60.2 & 55.6 & 59.1 \\
-Mistral  & Other & 52.7 & 49.6 & 52.6 \\
+Mistral  & Other & 52.7 & 49.6 & 52.7 \\
 Mistral  & Self  & 42.7 & 37.1 & 48.2 \\
 Qwen     & Other & 59.6 & 58.4 & 60.7 \\
 Qwen     & Self  & 51.3 & 50.0 & 52.0 \\
@@ -1099,31 +1111,45 @@ Primary statistical controls & Binomial chance floor (25\%), conclusion consiste
 \begin{table}[H]
 \centering
 \small
-\caption{Self-recognition probe results: raw selection accuracy vs.\ conclusion-controlled decisive test. Chance accuracy is 25\% for the 4-way choice; in the decisive test, chance reflects the number of models sharing that conclusion on tied items. Apparent recognition dissolves once conclusion-matching is accounted for ($p$-values evaluated against Bonferroni family threshold $\alpha = 0.05/12 = 0.0042$).}
+\caption{Self-recognition probe results: raw selection accuracy vs.\ conclusion-controlled decisive test. Chance accuracy is 25\% for the 4-way choice; in the decisive test, chance reflects the number of models sharing that conclusion on tied items. After Bonferroni correction only DeepSeek in science exceeds conclusion-matching chance, and Mistral falls below it in science and code ($p$-values evaluated against Bonferroni family threshold $\alpha = 0.05/12 = 0.0042$).}
 \label{tab:self-rec-results}
+\resizebox{\textwidth}{!}{%
 \begin{tabular}{llcccc}
 \toprule
 Domain & Model & Raw accuracy & 95\% CI & Decisive test (observed vs.\ chance) & Bonferroni verdict \\
 \midrule
-Science & DeepSeek & 56.0\% & [47.7, 64.1] & 47.9\% vs.\ 36.2\% ($p=0.0021$) & Style recognition \\
-Science & Qwen     & 27.3\% & [20.3, 35.3] & 23.3\% vs.\ 36.0\% ($p=0.9840$) & Conclusion-matching only \\
-Science & Llama    & 31.3\% & [24.0, 39.5] & 26.9\% vs.\ 35.8\% ($p=0.9610$) & Conclusion-matching only \\
-Science & Mistral  & 11.3\% & [6.7, 17.5]  & 10.3\% vs.\ 35.9\% ($p=0.0001$) & Below chance (aesthetic bias) \\
+Science & DeepSeek & 56.0\% & [47.7, 64.1] & 57.1\% vs.\ 38.9\% ($p<0.0001$) & Style recognition \\
+Science & Qwen     & 27.3\% & [20.4, 35.2] & 28.6\% vs.\ 38.1\% ($p=0.0374$) & Conclusion-matching only$^\dagger$ \\
+Science & Llama    & 31.3\% & [23.9, 39.5] & 29.1\% vs.\ 38.6\% ($p=0.0400$) & Conclusion-matching only$^\dagger$ \\
+Science & Mistral  & 8.7\%  & [4.7, 14.4]  & 11.8\% vs.\ 38.9\% ($p<0.0001$) & Below chance \\
 \midrule
-Math    & DeepSeek & 42.0\% & [34.0, 50.3] & 36.8\% vs.\ 33.1\% ($p=0.2810$) & Conclusion-matching only \\
-Math    & Qwen     & 38.0\% & [30.2, 46.2] & 32.1\% vs.\ 33.0\% ($p=0.6120$) & Conclusion-matching only \\
-Math    & Llama    & 34.0\% & [26.5, 42.1] & 30.5\% vs.\ 32.9\% ($p=0.7430$) & Conclusion-matching only \\
-Math    & Mistral  & 20.0\% & [13.9, 27.3] & 18.2\% vs.\ 33.2\% ($p=0.0120$) & Conclusion-matching only$^\dagger$ \\
+Math    & DeepSeek & 38.7\% & [30.8, 47.0] & 35.5\% vs.\ 30.5\% ($p=0.2498$) & Conclusion-matching only \\
+Math    & Qwen     & 37.3\% & [29.6, 45.6] & 38.2\% vs.\ 30.8\% ($p=0.0990$) & Conclusion-matching only \\
+Math    & Llama    & 30.0\% & [22.8, 38.0] & 26.1\% vs.\ 31.5\% ($p=0.2609$) & Conclusion-matching only \\
+Math    & Mistral  & 14.7\% & [9.4, 21.4]  & 13.5\% vs.\ 27.8\% ($p=0.0059$) & Conclusion-matching only$^\dagger$ \\
 \midrule
-Code    & DeepSeek & 36.7\% & [29.0, 44.9] & 32.4\% vs.\ 31.8\% ($p=0.4520$) & Conclusion-matching only \\
-Code    & Qwen     & 34.7\% & [27.1, 42.8] & 30.9\% vs.\ 31.5\% ($p=0.5840$) & Conclusion-matching only \\
-Code    & Llama    & 32.7\% & [25.3, 40.8] & 29.8\% vs.\ 31.6\% ($p=0.6950$) & Conclusion-matching only \\
-Code    & Mistral  & 14.0\% & [8.9, 20.6]  & 13.5\% vs.\ 31.7\% ($p=0.0003$) & Below chance (aesthetic bias) \\
+Code    & DeepSeek & 24.0\% & [17.4, 31.6] & 22.9\% vs.\ 30.5\% ($p=0.0568$) & Conclusion-matching only \\
+Code    & Qwen     & 30.0\% & [22.8, 38.0] & 29.9\% vs.\ 30.5\% ($p=0.9280$) & Conclusion-matching only \\
+Code    & Llama    & 38.7\% & [30.8, 47.0] & 38.7\% vs.\ 30.4\% ($p=0.0405$) & Conclusion-matching only$^\dagger$ \\
+Code    & Mistral  & 19.3\% & [13.3, 26.6] & 16.8\% vs.\ 29.9\% ($p=0.0013$) & Below chance \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \vspace{2pt}
-{\footnotesize $^\dagger$Does not survive family-wise Bonferroni correction ($p \ge 0.0042$).}
+{\footnotesize $^\dagger$Nominally significant ($p<0.05$, two-sided binomial test at the mean tie-chance) but does not survive family-wise Bonferroni correction ($p \ge 0.0042$).}
 \end{table}
+
+\paragraph{Mediation and consistency control.} In science, DeepSeek approves its own wrong
+answers on 67.0\% of verification calls for items where the probe found it recognised its
+answer (333 calls), against 44.8\% where it did not (324 calls), a $+22.2$ pp gap. Restricted to
+probes where it picked an answer matching its own conclusion, picking its own answer rather than
+another model's answer with the same conclusion gives 67.0\% (333) against 64.2\% (81), $+2.8$ pp
+($\chi^2$, $p=0.73$), consistent with approval tracking the conclusion rather than recognition of
+the text. Counts
+are verification calls, nine per item (three frames by three strategies); a permutation test
+that keeps each item's nine calls together gives $p=0.03$ for the $+22.2$ pp gap (37 against 36
+items) and $p=0.88$ for the $+2.8$ pp difference (37 against 9 items). Item-level bootstrap 95\%
+intervals are $[+2, +41]$ pp and $[-27, +35]$ pp: with nine comparison items the control cannot
+exclude an effect as large as the original gap.
 
 \section{Capability and Grounding: Full Breakdown}
 \label{app:capability}
@@ -1386,7 +1412,8 @@ An additional \textbf{0.8\%} of overrides were flagged as \texttt{REFERENCE\_BUG
 64{,}800 verifications. Code and mathematics are released in full, including the generated
 candidates and the raw verifier responses. Science is released as identifiers, answer
 letters, extracted-parse metadata, verdicts, latency and token counts: no question text, no
-option strings, and no candidate or verifier prose. Reports, figures, prompts and harnesses
+option strings, and no candidate or verifier prose; science rows elsewhere under
+\texttt{reports/} (probe traces, per-call results) are redacted the same way. Summary tables, figures, prompts and harnesses
 are released unchanged. Every table in this paper is re-derivable from the released
 records, because science correctness is defined as an extracted option letter compared
 against the stored ground-truth letter, and both are retained. The transcript-free release
@@ -1431,6 +1458,10 @@ python src/probes/plot_ensemble.py
 python src/probes/plot_oversight.py
 python src/probes/generate_self_preference_report.py
 python src/probes/generate_style_transfer_report.py
+python src/probes/analysis_self_recognition.py --domain science
+python src/probes/analysis_self_recognition.py --domain math
+python src/probes/analysis_self_recognition.py --domain code
+python src/probes/plot_self_recognition.py
 \end{verbatim}
 Science grading reads the option letter recorded at verification time instead of re-parsing
 candidate text, so the released records regenerate the published numbers. If the letters

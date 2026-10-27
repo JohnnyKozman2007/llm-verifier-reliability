@@ -67,6 +67,10 @@ python src/probes/plot_ensemble.py
 python src/probes/plot_oversight.py
 python src/probes/generate_self_preference_report.py
 python src/probes/generate_style_transfer_report.py
+python src/probes/analysis_self_recognition.py --domain science
+python src/probes/analysis_self_recognition.py --domain math
+python src/probes/analysis_self_recognition.py --domain code
+python src/probes/plot_self_recognition.py
 ```
 Science grading reads the option letter recorded at verification time instead of re-parsing
 candidate text, so the released records reproduce the published numbers. If the letters are

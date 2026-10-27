@@ -20,8 +20,7 @@ import pandas as pd
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from analysis_detectability import load_or_build_grades
-from science_utils import parse_science_for_item
+from analysis_detectability import load_or_build_grades, load_science_letters
 
 MODELS = ["qwen", "deepseek", "llama", "mistral"]
 
@@ -101,12 +100,15 @@ def quality_confound(df, domain, mode="actual"):
     valid["chose_longest"] = [
         lens.get((r.item_id, r.chosen_author), 0) == max(
             lens.get((r.item_id, m), 0) for m in MODELS) for r in valid.itertuples()]
+    if domain == "science":
+        print("  (science candidate text is [WITHHELD] in the release, so 'picked LONGEST' is n/a)")
     print(f"  {'model':10s} {'picked own':>11s} {'picked a CORRECT ans':>21s} {'picked LONGEST':>16s}")
     for m in MODELS:
         d = valid[valid.probe_model == m]
         if len(d) == 0: continue
+        longest = "n/a" if domain == "science" else f"{d.chose_longest.mean()*100:.1f}%"
         print(f"  {m:10s} {d.correct.mean()*100:10.1f}% {d.chose_correct_answer.mean()*100:20.1f}% "
-              f"{d.chose_longest.mean()*100:15.1f}%")
+              f"{longest:>16s}")
     print("  Chance is 25% for 'own' and 'longest'. If 'picked correct' is far above the")
     print("  base rate of correct answers, the model is judging quality, not authorship.")
 
@@ -119,16 +121,10 @@ def distinguishability(df, domain, mode="actual"):
         print(f"\n  [distinguishability] skipped for {domain} (needs parsed option letters)")
         return
     print(f"\n{'='*76}\n4. DISTINGUISHABILITY [{domain}]\n{'='*76}")
-    suffix = ".jsonl" if mode == "actual" else "_pilot.jsonl"
-    raw = {json.loads(l)["item_id"]: json.loads(l)
-           for l in open(os.path.join("data", "raw", f"{domain}{suffix}"), encoding="utf-8")}
     n_distinct = {}
-    for l in open(os.path.join("data", "generated", f"{domain}{suffix}"), encoding="utf-8"):
-        d = json.loads(l); ri = raw.get(d["item_id"])
-        if not ri: continue
-        letters = {parse_science_for_item(c, ri)["letter"]
-                   for c in (d.get("candidates") or {}).values()}
-        n_distinct[d["item_id"]] = len(letters)
+    for (item_id, _), letter in load_science_letters(mode).items():
+        n_distinct.setdefault(item_id, set()).add(letter)
+    n_distinct = {i: len(s) for i, s in n_distinct.items()}
     valid = df[df.choice.notna()].copy()
     valid["n_letters"] = valid.item_id.map(n_distinct)
     from scipy.stats import binomtest
@@ -215,17 +211,14 @@ def style_vs_conclusion(df, domain, mode="actual"):
 
 def _answer_key(domain, mode):
     """Comparable 'what did this model conclude' key. None where no clean key exists."""
+    if domain == "science":
+        return load_science_letters(mode)
     suffix = ".jsonl" if mode == "actual" else "_pilot.jsonl"
-    raw = {json.loads(l)["item_id"]: json.loads(l)
-           for l in open(os.path.join("data", "raw", f"{domain}{suffix}"), encoding="utf-8")}
     key = {}
     for l in open(os.path.join("data", "generated", f"{domain}{suffix}"), encoding="utf-8"):
-        d = json.loads(l); ri = raw.get(d["item_id"])
-        if not ri: continue
+        d = json.loads(l)
         for m, c in (d.get("candidates") or {}).items():
-            if domain == "science":
-                key[(d["item_id"], m)] = parse_science_for_item(c, ri)["letter"]
-            elif domain == "math":
+            if domain == "math":
                 import re
                 mm = re.findall(r"<answer>(.*?)</answer>", c or "", re.S)
                 key[(d["item_id"], m)] = mm[-1].strip() if mm else None
@@ -307,8 +300,8 @@ def consistency_control(df, domain, mode="actual"):
     thing it picked was its OWN answer or another model's answer with the same
     conclusion. If recognition mattered, the first group should approve more.
 
-    In science this comes out NULL (+2.8pp, p=0.73), meaning the +22.2pp mediation was
-    consistency, not recognition.
+    For deepseek in science this comes out NULL (+2.8pp, p=0.73), meaning its +22.2pp
+    mediation was consistency, not recognition.
     """
     from scipy.stats import chi2_contingency
     print(f"\n{'='*76}\n5b. CONSISTENCY CONTROL — was the mediation just self-consistency?"

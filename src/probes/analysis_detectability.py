@@ -18,7 +18,7 @@ from collections import defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from science_utils import grade_science_candidate, parse_science_for_item
+from science_utils import grade_science_candidate
 from execution_grounding import run_candidate_code
 
 DOMAINS = ["science", "math", "code"]
@@ -67,6 +67,20 @@ def load_or_build_grades(domain, mode="actual"):
     json.dump({f"{k[0]}|{k[1]}": v for k, v in grades.items()}, open(cache, "w"))
     print(f"  [{domain}] cached {len(grades)} grades -> {cache}")
     return grades
+
+
+def load_science_letters(mode="actual"):
+    """
+    (item_id, generator) -> option letter the generator chose, as extracted at verification
+    time. Released science candidates are [WITHHELD], so the letter cannot be re-parsed from
+    data/generated/; every verified row keeps it, identical across the 36 rows of a candidate.
+    """
+    suffix = "_pilot.jsonl" if mode == "pilot" else ".jsonl"
+    letters = {}
+    for line in open(os.path.join("data", "verified", f"science{suffix}"), encoding="utf-8"):
+        v = json.loads(line)
+        letters.setdefault((v["item_id"], v["generator_model"]), v.get("candidate_answer_letter"))
+    return letters
 
 
 # ── Step 1: analysis frame ────────────────────────────────────────────
@@ -304,17 +318,14 @@ def mechanism(df, domain, mode="actual"):
     if domain == "code":
         print(f"\n  [mechanism] skipped for code (no scalar answer to compare)"); return
     suffix = "_pilot.jsonl" if mode == "pilot" else ".jsonl"
-    raw = {json.loads(l)["item_id"]: json.loads(l)
-           for l in open(os.path.join("data", "raw", f"{domain}{suffix}"), encoding="utf-8")}
-    ans = {}
-    for line in open(os.path.join("data", "generated", f"{domain}{suffix}"), encoding="utf-8"):
-        d = json.loads(line); ri = raw.get(d["item_id"])
-        if not ri: continue
-        for m, c in (d.get("candidates") or {}).items():
-            if domain == "science":
-                ans[(d["item_id"], m)] = parse_science_for_item(c, ri)["letter"]
-            else:
-                import re
+    if domain == "science":
+        ans = load_science_letters(mode)
+    else:
+        import re
+        ans = {}
+        for line in open(os.path.join("data", "generated", f"{domain}{suffix}"), encoding="utf-8"):
+            d = json.loads(line)
+            for m, c in (d.get("candidates") or {}).items():
                 mm = re.findall(r"<answer>(.*?)</answer>", c or "", re.S)
                 ans[(d["item_id"], m)] = mm[-1].strip() if mm else None
 
