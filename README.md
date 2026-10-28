@@ -17,7 +17,7 @@ over 3 domains (HumanEval+, MATH, GPQA-Diamond) of 150 items each.
 - `reports/` summary CSVs and probe reports; `plots/` figures
 - `prompts/` rewrite prompts used in the style-transfer probe
 - `paper/` workshop paper sources (numbers aligned with the corrected MATH grader): `paper.tex` is
-  the shared body; `verify-agents/main.tex` and `tae/main.tex` build each workshop's camera-ready
+  the shared body; `verify-agents/main.tex` and `tae/main.tex` build each workshop's camera-ready; `arxiv/` contains the self-contained arXiv preprint build
 
 GPQA-Diamond item text is withheld in every released artifact. Science traces carry item
 ids, answer letters, extracted-parse metadata and verdicts, but no stems, no option strings
